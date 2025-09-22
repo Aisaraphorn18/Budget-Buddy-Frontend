@@ -1,184 +1,232 @@
-//test
 "use client";
+import { useMemo, useState } from "react";
 
-import { useState } from 'react';
+const COLORS = ["#6E47E8", "#10B981", "#f59e0b", "#ef4444"];
 
-export default function DashboardContent({
-  viewType,
-  categoryFilter,
-  expensesData,
-  incomeExpenseData,
-  summaryData,
-  totalExpenses,
-  yearlyIncome,
-  yearlyExpense,
-  onViewChange,
-  onCategoryChange,
-  getCategoryColor,
-}) {
-  const [language, setLanguage] = useState('th');
+const categoryData = [
+  { key: "Investment", amount: 1912.5, color: COLORS[0], icon: "📈" },
+  { key: "Food",       amount: 1912.5, color: COLORS[1], icon: "🍽️" },
+  { key: "Shopping",   amount: 1912.5, color: COLORS[2], icon: "🧾" },
+  { key: "Others",     amount: 1912.5, color: COLORS[3], icon: "⋯" },
+];
 
-  const categories = ['all', 'Investment', 'Food', 'Shopping', 'Others'];
+const monthly = [
+  { m: "Jan", income: 2200, expense: 1800 },
+  { m: "Feb", income: 1800, expense: 1600 },
+  { m: "Mar", income: 2100, expense: 1400 },
+  { m: "Apr", income: 2000, expense: 1500 },
+  { m: "May", income: 1950, expense: 1550 },
+  { m: "Jun", income: 2050, expense: 1600 },
+  { m: "Jul", income: 2600, expense: 2000 },
+  { m: "Aug", income: 2500, expense: 2300 },
+  { m: "Sep", income: 2400, expense: 1500 },
+  { m: "Oct", income: 2300, expense: 2100 },
+  { m: "Nov", income: 2350, expense: 2200 },
+  { m: "Dec", income: 2450, expense: 2300 },
+];
 
-  const renderOverview = () => (
-    <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">All Expenses</h2>
-            {/* PieChart component would go here */}
-            <div className="flex justify-center mt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-pink-500">{totalExpenses.toLocaleString()} บาท</div>
-                <div className="text-sm text-gray-500">Total Expenses</div>
-              </div>
-            </div>
-            <div className="flex justify-center mt-4 space-x-8">
-              {expensesData.map((item) => (
-                <div key={item.name} className="flex items-center space-x-2">
-                  <div className="w-4 h-4" style={{ backgroundColor: item.color }}></div>
-                  <span>{item.name}</span>
-                </div>
-              ))}
-            </div>
-            <div className="text-center text-sm text-gray-500 mt-2">Data as of December 20, 2024</div>
-          </div>
-        </div>
+export default function DashboardContent() {
+  const [view, setView] = useState("summary");
+  const [chartType, setChartType] = useState("income-expense");
+  const [range, setRange] = useState("year");
 
-        <div className="lg:col-span-1 space-y-4">
-          {expensesData.map((item) => (
-            <div key={item.name} className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: item.color }}>
-                  {item.name.charAt(0)}
-                </div>
-                <div>
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-sm text-gray-500">{((item.value / totalExpenses) * 100).toFixed(0)}%</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-bold">{item.value.toFixed(2)} บาท</div>
-                <div className="text-sm text-pink-500">→</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Total Income (บาท)</h2>
-          <div className="flex space-x-2">
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-green-500"></div>
-              <span className="text-sm">Total Income (บาท)</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-red-500"></div>
-              <span className="text-sm">Total Expense (บาท)</span>
-            </div>
-          </div>
-        </div>
-        {/* BarChart component would go here */}
-        <div className="flex justify-between mt-4 text-sm text-gray-500">
-          <div>{yearlyIncome.toLocaleString()} Income & Expense Summary January 2024 - December 2024</div>
-          <div>{yearlyExpense.toLocaleString()}</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {summaryData.map((item) => (
-          <div key={item.period} className="bg-white rounded-lg shadow p-6">
-            <h3 className="font-semibold mb-4">{item.period}</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Total Income :</span>
-                <span className="text-green-600 font-medium">{item.income.toLocaleString()} บาท</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Expenses :</span>
-                <span className="text-red-600 font-medium">{item.expense.toLocaleString()} บาท</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t">
-                <span>Net Balance :</span>
-                <span className="text-green-600 font-bold">{item.balance.toLocaleString()} บาท</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
+  const totalCat = useMemo(
+    () => categoryData.reduce((s, d) => s + d.amount, 0),
+    []
   );
 
-  const renderCategory = () => (
-    <div className="lg:col-span-1 space-y-4">
-      {expensesData.map((item) => (
-        <div key={item.name} className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: item.color }}>
-              {item.name.charAt(0)}
-            </div>
-            <div>
-              <div className="font-medium">{item.name}</div>
-              <div className="text-sm text-gray-500">{((item.value / totalExpenses) * 100).toFixed(0)}%</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="font-bold">{item.value.toFixed(2)} บาท</div>
-            <div className="text-sm text-pink-500">→</div>
-          </div>
-        </div>
-      ))}
-    </div>
+  const parts = useMemo(() => {
+    let acc = 0;
+    return categoryData.map((d) => {
+      const pct = (d.amount / totalCat) * 100;
+      const from = acc;
+      const to = acc + pct;
+      acc = to;
+      return { ...d, pct, from, to };
+    });
+  }, [totalCat]);
+
+  const donutGradient = useMemo(() => {
+    const stops = parts.map((p) => `${p.color} ${p.from}% ${p.to}%`).join(", ");
+    return `conic-gradient(${stops})`;
+  }, [parts]);
+
+  const maxY = useMemo(
+    () => Math.max(...monthly.flatMap((x) => [x.income, x.expense])),
+    []
   );
+  const totalIncome = useMemo(
+    () => monthly.reduce((s, x) => s + x.income, 0),
+    []
+  );
+  const totalExpense = useMemo(
+    () => monthly.reduce((s, x) => s + x.expense, 0),
+    []
+  );
+
+  const asOf = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+  });
 
   return (
-    <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Finance Chart</h1>
-          <p className="text-gray-600">Keep track your financial plan</p>
+    <div className="content">
+      <header className="fc-topbar">
+        <div className="fc-title">
+          <h1>Finance Chart</h1>
+          <p>Keep track your financial plan</p>
         </div>
-        <div className="flex space-x-2">
-          <button
-            className={`px-4 py-2 rounded-md ${language === 'th' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
-            onClick={() => setLanguage('th')}
-          >
-            ภาษาไทย
-          </button>
-          <button
-            className={`px-4 py-2 rounded-md ${language === 'en' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
-            onClick={() => setLanguage('en')}
-          >
-            English
-          </button>
+        <div className="fc-back" title="Back">❮</div>
+      </header>
+
+      <div className="row-head">
+        <div className="fc-segment">
+          <button className={`seg ${view === "summary" ? "active" : ""}`} onClick={() => setView("summary")}>ภาพรวม</button>
+          <button className={`seg ${view === "category" ? "active" : ""}`} onClick={() => setView("category")}>ตามหมวดหมู่</button>
         </div>
-        <div className="flex space-x-2">
-          <select
-            className="px-4 py-2 border rounded-md"
-            value={viewType}
-            onChange={(e) => onViewChange(e.target.value)}
-          >
-            <option value="overview">Overview</option>
-            <option value="category">Category</option>
-          </select>
-          <select
-            className="px-4 py-2 border rounded-md"
-            value={categoryFilter}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            disabled={viewType === 'overview'}
-          >
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat === 'all' ? 'All' : cat}
-              </option>
-            ))}
-          </select>
+
+        <div className="fc-filters">
+          <div className="fc-filter">
+            <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
+              <option value="income-expense">Income & Expense Chart</option>
+              <option value="income">Income Only</option>
+              <option value="expense">Expense Only</option>
+            </select>
+          </div>
+          <div className="fc-filter">
+            <select value={range} onChange={(e) => setRange(e.target.value)}>
+              <option value="year">This Year</option>
+              <option value="month">This Month</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {viewType === 'overview' ? renderOverview() : renderCategory()}
-    </>
+      {view === "summary" && (
+        <>
+          <section className="fc-board">
+            <div className="bar-head">
+              <h3>Income & Expenses</h3>
+            </div>
+            <div className="bars-wrap">
+              {monthly.map((x) => {
+                const ih = Math.round((x.income / maxY) * 100);
+                const eh = Math.round((x.expense / maxY) * 100);
+                return (
+                  <div className="bar-col" key={x.m} title={x.m}>
+                    <div className="bar-stack">
+                      <div className="bar income" style={{ height: `${ih}%` }} />
+                      <div className="bar expense" style={{ height: `${eh}%` }} />
+                    </div>
+                    <div className="bar-label">{x.m}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="totals-row">
+              <div className="mini-total">
+                <span className="mini-ic">🐷</span>
+                <div className="mini-meta">
+                  <div className="mini-title">Total Income (Baht)</div>
+                  <div className="mini-value">฿{totalIncome.toLocaleString()}</div>
+                </div>
+              </div>
+              <div className="mini-total">
+                <span className="mini-ic">🐷</span>
+                <div className="mini-meta">
+                  <div className="mini-title">Total Expenses (Baht)</div>
+                  <div className="mini-value">฿{totalExpense.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="fc-sub">Income & Expense Summary (January 2024 - December 2024)</div>
+            <div className="fc-date">Data as of {asOf}</div>
+          </section>
+
+          <section className="month-list">
+            <h4 className="year-title">2024</h4>
+            {["Dec", "Nov", "Oct"].map((mm) => {
+              const row = monthly.find((x) => x.m.startsWith(mm)) ?? monthly[0];
+              const net = row.income - row.expense;
+              return (
+                <div className="month-card" key={mm}>
+                  <div className="month-head">{mm} 24</div>
+                  <div className="month-line">
+                    <span>Total Income :</span>
+                    <b className="green">{row.income.toFixed(2)} Baht</b>
+                  </div>
+                  <div className="month-line">
+                    <span>Total Expenses :</span>
+                    <b className="red">{row.expense.toFixed(2)} Baht</b>
+                  </div>
+                  <div className="month-line">
+                    <span>Net Balance :</span>
+                    <b className={net >= 0 ? "green" : "red"}>{net.toFixed(2)} Baht</b>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        </>
+      )}
+
+      {view === "category" && (
+        <>
+          <section className="fc-board">
+            <div className="fc-chart">
+              <h3>All Expenses</h3>
+              <div className="donut-wrap">
+                <div className="donut" style={{ background: donutGradient }}>
+                  <div className="donut-hole">
+                    <div className="donut-label">100%</div>
+                  </div>
+                </div>
+                <ul className="legend">
+                  {parts.map((p) => (
+                    <li key={p.key}>
+                      <span className="dot" style={{ background: p.color }} />
+                      {p.key}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="fc-total">
+              <div className="pig">🐷</div>
+              <div className="meta">
+                <div className="label">Total Expenses (Baht)</div>
+                <div className="value">฿{(totalCat * 443).toLocaleString("en-US")}</div>
+              </div>
+            </div>
+
+            <div className="fc-date">Data as of {asOf}</div>
+          </section>
+
+          <section className="fc-list">
+            {parts.map((p) => (
+              <button key={p.key} className="row">
+                <div className="left">
+                  <div className="badge" style={{ background: "#F3F4F6" }}>
+                    <span className="emoji">
+                      {categoryData.find((c) => c.key === p.key)?.icon}
+                    </span>
+                  </div>
+                  <div className="name">{p.key}</div>
+                </div>
+                <div className="right">
+                  <div className="amount">฿{(p.amount * 443).toLocaleString()}</div>
+                  <div className="percent">{p.pct.toFixed(1)}%</div>
+                  <div className="chev">›</div>
+                </div>
+              </button>
+            ))}
+          </section>
+        </>
+      )}
+    </div>
   );
 }

@@ -39,7 +39,8 @@ body{
 .sidebar{
   width:260px;
   background: var(--panel);
-  display:flex; flex-direction:column;
+  display:flex; 
+  flex-direction:column;
   border-right:1px solid rgba(0,0,0,.06);
   padding:20px 18px;
   gap:20px;
@@ -61,12 +62,20 @@ body{
 
 .logout{margin-top:auto}
 .logout-btn{
-  width:100%; padding:14px; border-radius:14px;
+  width:100%; padding:14px; 
+  border-radius:14px;
   background: var(--red);
   border:none;
-  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-  box-shadow:var(--shadow); color:#fff; font-weight:700;
-  transition:background .2s ease, transform .1s ease;
+  cursor:pointer; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  gap:8px;
+  box-shadow:var(--shadow); 
+  color:#fff; 
+  font-weight:700;
+  transition:background .2s ease, 
+  transform .1s ease;
 }
 .logout-btn:hover{ background:#c53030; transform:translateY(-1px); }
 .icon{width:20px;height:20px; object-fit:contain}
