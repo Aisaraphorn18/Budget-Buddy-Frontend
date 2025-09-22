@@ -1,0 +1,140 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f6e4e7;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    text-align: left;
+    margin-bottom: 25px;
+}
+
+h1 {
+    font-size: 28px;
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+p {
+    font-size: 15px;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.transaction-section {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 0 25px 25px 25px; /* ปรับ padding-top เป็น 0 และเพิ่ม padding ล่าง */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease-in-out;
+    max-height: 600px; /* จำกัดความสูงเพื่อให้เลื่อนได้ */
+    overflow-y: auto; /* เพิ่ม scroll bar แนวตั้ง */
+    position: relative; /* ใช้เป็น reference สำหรับ z-index */
+    margin-bottom: 20px; /* ระยะห่างด้านล่าง */
+}
+
+.transaction-section:hover {
+    transform: translateY(-2px);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    margin-bottom: 0; /* ลบ margin ด้านล่างของตาราง */
+    background-color: #fff;
+    table-layout: fixed; /* ควบคุมความกว้างคอลัมน์ */
+}
+
+thead {
+    position: sticky;
+    top: 0; /* ล็อคหัวตารางด้านบนสุด */
+    z-index: 100; /* อยู่ชั้นสูงสุด */
+    background-color: #f8f9fa; /* ตรึงสีพื้นหลัง */
+}
+
+th {
+    color: #34495e;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 15px;
+    border-bottom: 2px solid #ddd; /* เส้นแบ่งชัดเจน */
+}
+
+td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    background-color: #ffffff;
+    transition: background-color 0.2s;
+}
+
+tr:hover td {
+    background-color: #f9fbfd;
+}
+
+.income-amount {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.expense-amount {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.category-note {
+    font-size: 15px;
+    color: #2c3e50;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0; /* ป้องกันการขยายเกิน */
+}
+
+.date {
+    color: #7f8c8d;
+    font-size: 14px;
+}
+
+.type-income {
+    color: #27ae60;
+    font-weight: 500;
+}
+
+.type-expense {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+/* เพิ่ม scrollbar สไตล์ */
+.transaction-section::-webkit-scrollbar {
+    width: 8px;
+}
+
+.transaction-section::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.transaction-section::-webkit-scrollbar-thumb {
+    background: #3498db;
+    border-radius: 4px;
+}
+
+.transaction-section::-webkit-scrollbar-thumb:hover {
+    background: #2980b9;
+}
+
+.data-date {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    margin-top: 15px;
+    font-style: italic;
+}
