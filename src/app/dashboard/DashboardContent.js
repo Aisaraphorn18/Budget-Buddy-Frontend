@@ -1,5 +1,10 @@
 "use client";
+import "./styles.css";
+import Sidebar from "@/app/components/sidebar";
+
 import { useMemo, useState } from "react";
+
+
 
 const COLORS = ["#6E47E8", "#10B981", "#f59e0b", "#ef4444"];
 
@@ -70,14 +75,21 @@ export default function DashboardContent() {
     day: "2-digit",
   });
 
+  const [isOpen, setIsOpen] = useState(false);
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
   return (
     <div className="content">
+      <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
       <header className="fc-topbar">
         <div className="fc-title">
+          <button onClick={toggleSidebar}>
+            <img src="/hamburger.png" alt="icon-ham" className="iconham"/>
+          </button>
           <h1>Finance Chart</h1>
           <p>Keep track your financial plan</p>
         </div>
-        <div className="fc-back" title="Back">❮</div>
+        
       </header>
 
       <div className="row-head">

@@ -35,50 +35,14 @@ body{
 /* Layout */
 .app{display:flex;min-height:100vh}
 
-/* Sidebar */
-.sidebar{
-  width:260px;
-  background: var(--panel);
-  display:flex; 
-  flex-direction:column;
-  border-right:1px solid rgba(0,0,0,.06);
-  padding:20px 18px;
-  gap:20px;
+.iconham{
+  width: 24px;
+  height: 24px;
+  box-shadow: none; /* ไม่ต้องมีเงาเหมือนโลโก้ */
+  border-radius: 0; /* เอามุมโค้งออก */
 }
-.brand{display:flex; align-items:center; gap:12px; padding:6px 10px}
-.brand img{width:36px;height:36px;border-radius:10px;box-shadow:var(--shadow)}
-.brand span{font-weight:800; color: var(--text);}
 
-.nav{display:flex; flex-direction:column; gap:8px}
-.nav-item{
-  display:flex; align-items:center; gap:12px; padding:12px 14px;
-  border-radius:12px; color: var(--text); text-decoration:none;
-  background: var(--panel);
-  box-shadow: 0 1px 0 rgba(0,0,0,.02), inset 0 1px 2px rgba(0,0,0,.03);
-  border:1px solid rgba(0,0,0,.03);
-}
-.nav-item.active{outline:2px solid #b13751}
-.nav-ic{font-size:18px}
 
-.logout{margin-top:auto}
-.logout-btn{
-  width:100%; padding:14px; 
-  border-radius:14px;
-  background: var(--red);
-  border:none;
-  cursor:pointer; 
-  display:flex; 
-  align-items:center; 
-  justify-content:center; 
-  gap:8px;
-  box-shadow:var(--shadow); 
-  color:#fff; 
-  font-weight:700;
-  transition:background .2s ease, 
-  transform .1s ease;
-}
-.logout-btn:hover{ background:#c53030; transform:translateY(-1px); }
-.icon{width:20px;height:20px; object-fit:contain}
 
 /* Main */
 .main{flex:1; padding:26px 28px 40px}
@@ -167,6 +131,76 @@ body{
 .progress{height:10px; background:#eef2ff; border-radius:999px; margin-top:8px; overflow:hidden}
 .dark .progress{ background:#7e556d; }
 .progress .bar{height:100%; background:var(--purple)}
+
+/* Modal */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 16px;
+}
+.modal{
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.modal-header.center{
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px 10px;
+}
+.modal-title{
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #b01282; /* สีม่วงอมชมพู */
+}
+.modal-body{ padding: 20px; }
+.form-row{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.input{
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  outline: none;
+  font-size: 14px;
+}
+.input:focus{
+  border-color: #b01282;
+  box-shadow: 0 0 0 2px rgba(176,18,130,.15);
+}
+.modal-actions.center{
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+.btn-purple{
+  background: #b01282;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-purple:hover{
+  background: #93106c;
+}
+
+
 
 /* Responsive */
 @media (max-width: 1200px){
