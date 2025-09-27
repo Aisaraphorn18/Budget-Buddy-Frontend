@@ -1,0 +1,174 @@
+:root{
+  --bg:#f6e4e7;
+  --card:#ffffff;
+  --txt:#000000;
+  --muted:#6b7280;
+  --ring:#e9edf1;
+  --radius:16px;
+  --shadow:0 18px 40px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  --green:#10b981;
+  --red:#ef4444;
+}
+ 
+/* Dark mode */
+body.dark {
+  --bg:#1f2937;
+  --card:#374151;
+  --txt:#f3f4f6;
+  --muted:#9ca3af;
+}
+ 
+/* ===== Sidebar ===== */
+.sidebar{
+  position: fixed;           /* แทน sticky */
+  left: 0; top: 0; bottom: 0;
+  width: 260px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0,0,0,.06);
+  padding: 20px 18px;
+  gap: 20px;
+  z-index: 60;
+  transform: translateX(-100%);     /* ปิดค่าเริ่มต้น */
+  transition: transform .28s ease;
+}
+.sidebar.open{
+  transform: translateX(0);         /* เปิด */
+}
+ 
+.btn-back{
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;              /* ขยายพื้นที่คลิกให้แม่น */
+  line-height: 0;            /* กันช่องว่างแนวตั้ง */
+}
+ 
+.iconback{
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+ 
+ 
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:6px 10px
+}
+.brand img{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  box-shadow:var(--shadow)
+}
+.brand span{
+  font-weight:800;
+  color: var(--txt)
+}
+ 
+/* ลดขนาด hamburger */
+.brand img.hamburger {
+  width: 24px;
+  height: 24px;
+  box-shadow: none;
+  border-radius: 0;
+}
+ 
+.nav{display:flex; flex-direction:column; gap:8px}
+.nav-item{
+  display:flex; align-items:center; gap:12px; padding:12px 14px;
+  border-radius:12px; color: var(--txt); text-decoration:none;
+  background: var(--card);
+  box-shadow: 0 1px 0 rgba(0,0,0,.02), inset 0 1px 2px rgba(0,0,0,.03);
+  border:1px solid rgba(0,0,0,.03);
+}
+.nav-item.active{outline:2px solid #b13751}
+.nav-ic{font-size:18px}
+ 
+.logout{margin-top:auto}
+.logout-btn{
+  width:100%; padding:14px; border-radius:14px;
+  background: var(--red); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  box-shadow:var(--shadow); color:#fff; font-weight:700;
+  transition:background .2s ease, transform .1s ease;
+}
+.logout-btn:hover{ background:#c53030; transform:translateY(-1px) }
+.icon{width:20px;height:20px; object-fit:contain}
+ 
+/* ===== Overlay + Toggle ===== */
+.sb-overlay{
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease;
+  z-index: 50;
+}
+.sb-overlay.show{ opacity:1; pointer-events:auto; }
+ 
+/* เดสก์ท็อป: ไม่ต้องบังคับ transform อีกต่อไป แค่ซ่อน overlay ก็พอ */
+@media (min-width:1025px){
+  .sb-overlay{ display: none; }
+}
+/* ===== Main content ===== */
+.main{
+  flex:1;
+  padding:20px;
+  background: var(--bg);
+  min-height:100vh;
+  transition: background .3s ease;
+}
+ 
+/* Toggle switch */
+.toggle{
+  display:flex; align-items:center; gap:6px;
+}
+.toggle input{
+  display:none;
+}
+.toggle-slider{
+  cursor:pointer;
+}
+ 
+/* Summary cards */
+.summary{
+  display:flex; gap:20px; flex-wrap:wrap;
+}
+.card{
+  background: var(--card);
+  padding:16px;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  flex:1;
+  min-width:200px;
+}
+.sum-head{
+  display:flex; align-items:center; gap:8px;
+}
+.sum-title{ font-weight:700; color: var(--txt) }
+.sum-value{ font-size:1.5rem; font-weight:700; color: var(--txt) }
+.icon{ width:24px; height:24px; }
+ 
+/* Budget */
+.budget-header{
+  display:flex; justify-content:space-between; align-items:center; margin-top:32px;
+}
+.btn{ padding:8px 12px; border-radius:12px; cursor:pointer; font-weight:700; border:none; }
+.btn-green{ background:var(--green); color:#fff; }
+.btn-red{ background:var(--red); color:#fff; }
+.budget-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:16px;
+}
+.budget-card{
+  background:var(--card); padding:16px; border-radius:var(--radius); box-shadow:var(--shadow);
+}
+.bamount{ margin-top:12px; font-weight:700; color: var(--txt) }
+.bamount .muted{ font-weight:400; color: var(--muted); margin-left:4px; }
+.progress{ height:8px; background:var(--ring); border-radius:8px; margin-top:8px; }
+.progress .bar{ height:100%; background:var(--green); border-radius:8px; }

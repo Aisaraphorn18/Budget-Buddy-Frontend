@@ -1,15 +1,18 @@
 "use client";
+import "./Report.css";
+import Sidebar from "@/app/components/sidebar";
+ 
 import { useMemo, useState } from "react";
-
+ 
 const COLORS = ["#6E47E8", "#10B981", "#f59e0b", "#ef4444"];
-
+ 
 const categoryData = [
   { key: "Investment", amount: 1912.5, color: COLORS[0], icon: "📈" },
   { key: "Food",       amount: 1912.5, color: COLORS[1], icon: "🍽️" },
   { key: "Shopping",   amount: 1912.5, color: COLORS[2], icon: "🧾" },
   { key: "Others",     amount: 1912.5, color: COLORS[3], icon: "⋯" },
 ];
-
+ 
 const monthly = [
   { m: "Jan", income: 2200, expense: 1800 },
   { m: "Feb", income: 1800, expense: 1600 },
@@ -24,17 +27,17 @@ const monthly = [
   { m: "Nov", income: 2350, expense: 2200 },
   { m: "Dec", income: 2450, expense: 2300 },
 ];
-
+ 
 export default function DashboardContent() {
   const [view, setView] = useState("summary");
   const [chartType, setChartType] = useState("income-expense");
   const [range, setRange] = useState("year");
-
+ 
   const totalCat = useMemo(
     () => categoryData.reduce((s, d) => s + d.amount, 0),
     []
   );
-
+ 
   const parts = useMemo(() => {
     let acc = 0;
     return categoryData.map((d) => {
@@ -45,12 +48,12 @@ export default function DashboardContent() {
       return { ...d, pct, from, to };
     });
   }, [totalCat]);
-
+ 
   const donutGradient = useMemo(() => {
     const stops = parts.map((p) => `${p.color} ${p.from}% ${p.to}%`).join(", ");
     return `conic-gradient(${stops})`;
   }, [parts]);
-
+ 
   const maxY = useMemo(
     () => Math.max(...monthly.flatMap((x) => [x.income, x.expense])),
     []
@@ -63,29 +66,35 @@ export default function DashboardContent() {
     () => monthly.reduce((s, x) => s + x.expense, 0),
     []
   );
-
+ 
   const asOf = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "2-digit",
   });
-
+ 
+  const [isOpen, setIsOpen] = useState(false);
+  const toggleSidebar = () => setIsOpen(!isOpen);
+ 
   return (
     <div className="content">
+      <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
       <header className="fc-topbar">
         <div className="fc-title">
+          <button onClick={toggleSidebar}>
+            <img src="/hamburger.png" alt="icon-ham" className="iconham"/>
+          </button>
           <h1>Finance Chart</h1>
           <p>Keep track your financial plan</p>
         </div>
-        <div className="fc-back" title="Back">❮</div>
       </header>
-
+ 
       <div className="row-head">
         <div className="fc-segment">
           <button className={`seg ${view === "summary" ? "active" : ""}`} onClick={() => setView("summary")}>ภาพรวม</button>
           <button className={`seg ${view === "category" ? "active" : ""}`} onClick={() => setView("category")}>ตามหมวดหมู่</button>
         </div>
-
+ 
         <div className="fc-filters">
           <div className="fc-filter">
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
@@ -102,7 +111,7 @@ export default function DashboardContent() {
           </div>
         </div>
       </div>
-
+ 
       {view === "summary" && (
         <>
           <section className="fc-board">
@@ -124,7 +133,7 @@ export default function DashboardContent() {
                 );
               })}
             </div>
-
+ 
             <div className="totals-row">
               <div className="mini-total">
                 <span className="mini-ic">🐷</span>
@@ -141,11 +150,11 @@ export default function DashboardContent() {
                 </div>
               </div>
             </div>
-
+ 
             <div className="fc-sub">Income & Expense Summary (January 2024 - December 2024)</div>
             <div className="fc-date">Data as of {asOf}</div>
           </section>
-
+ 
           <section className="month-list">
             <h4 className="year-title">2024</h4>
             {["Dec", "Nov", "Oct"].map((mm) => {
@@ -172,7 +181,7 @@ export default function DashboardContent() {
           </section>
         </>
       )}
-
+ 
       {view === "category" && (
         <>
           <section className="fc-board">
@@ -194,7 +203,7 @@ export default function DashboardContent() {
                 </ul>
               </div>
             </div>
-
+ 
             <div className="fc-total">
               <div className="pig">🐷</div>
               <div className="meta">
@@ -202,13 +211,14 @@ export default function DashboardContent() {
                 <div className="value">฿{(totalCat * 443).toLocaleString("en-US")}</div>
               </div>
             </div>
-
+ 
             <div className="fc-date">Data as of {asOf}</div>
           </section>
-
-          <section className="fc-list">
-            {parts.map((p) => (
-              <button key={p.key} className="row">
+ 
+          {/* 🔹 แก้ตรงนี้: แยก section ต่อปุ่ม */}
+          {parts.map((p) => (
+            <section className="fc-list" key={p.key}>
+              <button className="row">
                 <div className="left">
                   <div className="badge" style={{ background: "#F3F4F6" }}>
                     <span className="emoji">
@@ -218,13 +228,15 @@ export default function DashboardContent() {
                   <div className="name">{p.key}</div>
                 </div>
                 <div className="right">
-                  <div className="amount">฿{(p.amount * 443).toLocaleString()}</div>
-                  <div className="percent">{p.pct.toFixed(1)}%</div>
-                  <div className="chev">›</div>
-                </div>
+      <div className="meta">
+        <span className="amount">11912.50 Baht</span>
+        <span className="percent">25.0%</span>
+      </div>
+      <span className="chev">›</span>
+    </div>
               </button>
-            ))}
-          </section>
+            </section>
+          ))}
         </>
       )}
     </div>
