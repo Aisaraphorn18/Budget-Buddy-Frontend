@@ -1,140 +1,142 @@
+:root {
+  --bg: #f6e4e7;
+  --panel: #ffffff;
+  --text: #222222;
+  --muted: #6b7280;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  --radius: 16px;
+  --purple: #6b56ff;
+  --green: #16a34a;
+  --red: #dc2626;
+}
+
 body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f6e4e7;
-    margin: 0;
-    padding: 20px;
-    color: #333;
-    line-height: 1.6;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
 }
 
-header {
-    text-align: left;
-    margin-bottom: 25px;
+
+/* กรอบใหญ่ */
+.transaction-wrapper {
+  background-color: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  width: 95%;
+  max-width: 1200px;
+  margin: 20px auto;
+  overflow: hidden;
 }
 
-h1 {
-    font-size: 28px;
-    margin: 0;
-    color: #2c3e50;
-    font-weight: 600;
+/* sidebar */
+.transaction-wrapper .sidebar {
+  min-width: 220px;
+  border-right: 1px solid #eee;
 }
 
-p {
-    font-size: 15px;
-    color: #7f8c8d;
-    margin-top: 5px;
-}
-
+/* content */
 .transaction-section {
-    background-color: #ffffff;
-    border-radius: 12px;
-    padding: 0 25px 25px 25px; /* ปรับ padding-top เป็น 0 และเพิ่ม padding ล่าง */
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease-in-out;
-    max-height: 600px; /* จำกัดความสูงเพื่อให้เลื่อนได้ */
-    overflow-y: auto; /* เพิ่ม scroll bar แนวตั้ง */
-    position: relative; /* ใช้เป็น reference สำหรับ z-index */
-    margin-bottom: 20px; /* ระยะห่างด้านล่าง */
+  flex: 1;
+  padding: 20px;
+  max-height: 500px;
+  overflow-y: auto;
 }
 
-.transaction-section:hover {
-    transform: translateY(-2px);
+/* หัวข้อ */
+.transaction-section h1 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+.fc-title h1{margin:0;font-size:28px}
+
+.transaction-section p {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 15px;
 }
 
+.transaction-iconham{
+  width: 24px;
+  height: 24px;
+  box-shadow: none; /* ไม่ต้องมีเงาเหมือนโลโก้ */
+  border-radius: 0; /* เอามุมโค้งออก */
+}
+
+/* ตาราง */
 table {
-    width: 100%;
-    border-collapse: collapse;
-    border-spacing: 0;
-    margin-bottom: 0; /* ลบ margin ด้านล่างของตาราง */
-    background-color: #fff;
-    table-layout: fixed; /* ควบคุมความกว้างคอลัมน์ */
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-thead {
-    position: sticky;
-    top: 0; /* ล็อคหัวตารางด้านบนสุด */
-    z-index: 100; /* อยู่ชั้นสูงสุด */
-    background-color: #f8f9fa; /* ตรึงสีพื้นหลัง */
+th,
+td {
+  padding: 10px;
+  text-align: left;
 }
 
 th {
-    color: #34495e;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 15px;
-    border-bottom: 2px solid #ddd; /* เส้นแบ่งชัดเจน */
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
-td {
-    padding: 15px;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-    background-color: #ffffff;
-    transition: background-color 0.2s;
+/* ความกว้างของแต่ละคอลัมน์ */
+th:nth-child(1),
+td:nth-child(1) {
+  width: 20%;
 }
 
-tr:hover td {
-    background-color: #f9fbfd;
+th:nth-child(2),
+td:nth-child(2) {
+  width: 20%;
+  text-align: center;
 }
 
-.income-amount {
-    color: #27ae60;
-    font-weight: 600;
+th:nth-child(3),
+td:nth-child(3) {
+  width: 20%;
+  text-align: center;
 }
 
-.expense-amount {
-    color: #e74c3c;
-    font-weight: 600;
+th:nth-child(4),
+td:nth-child(4) {
+  width: 25%;
+  text-align: right;
 }
 
-.category-note {
-    font-size: 15px;
-    color: #2c3e50;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 0; /* ป้องกันการขยายเกิน */
+tr {
+  border-bottom: 1px solid #eee;
 }
 
-.date {
-    color: #7f8c8d;
-    font-size: 14px;
+/* income/expense */
+.income {
+  color: var(--green);
+  font-weight: 600;
 }
 
-.type-income {
-    color: #27ae60;
-    font-weight: 500;
+.expense {
+  color: var(--red);
+  font-weight: 600;
 }
-
-.type-expense {
-    color: #e74c3c;
-    font-weight: 500;
-}
-
-/* เพิ่ม scrollbar สไตล์ */
-.transaction-section::-webkit-scrollbar {
-    width: 8px;
-}
-
-.transaction-section::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.transaction-section::-webkit-scrollbar-thumb {
-    background: #3498db;
-    border-radius: 4px;
-}
-
-.transaction-section::-webkit-scrollbar-thumb:hover {
-    background: #2980b9;
-}
-
-.data-date {
-    font-size: 13px;
-    color: #999;
-    text-align: center;
-    margin-top: 15px;
-    font-style: italic;
+.transaction-content {
+  background-color: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 95%;
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
 }

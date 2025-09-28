@@ -1,62 +1,80 @@
-'use client';
-import { useState, useEffect } from 'react';
-import './Tran.css';
+"use client";
 
-const TransactionsPage = () => {
-    const mockTransactions = [
-        { category: 'Income', note: 'Mom give', date: '08 Jan, 2022', type: 'income', amount: '217.90' },
-        { category: 'Income', note: 'Mom give', date: '06 Jan, 2022', type: 'income', amount: '329.90' },
-        { category: 'Foods and Groceries', note: 'Suki Tei', date: '03 Jan, 2022', type: 'expense', amount: '-549.90' },
-        { category: 'Foods and Groceries', note: 'KFC', date: '01 Jan, 2022', type: 'expense', amount: '-238.90' },
-        { category: 'Foods and Groceries', note: 'Spotify', date: '31 Dec, 2021', type: 'expense', amount: '-283.90' },
-        { category: 'Income', note: 'Mom give', date: '24 Dec, 2021', type: 'income', amount: '237.90' },
-        { category: 'Income', note: 'Bonus', date: '20 Dec, 2021', type: 'income', amount: '500.00' },
-        { category: 'Shopping', note: 'Clothes', date: '18 Dec, 2021', type: 'expense', amount: '-450.00' },
-        { category: 'Foods and Groceries', note: 'Market', date: '15 Dec, 2021', type: 'expense', amount: '-150.00' },
-        { category: 'Income', note: 'Freelance', date: '10 Dec, 2021', type: 'income', amount: '300.00' },
-        { category: 'Transport', note: 'Taxi', date: '08 Dec, 2021', type: 'expense', amount: '-200.00' },
-        { category: 'Income', note: 'Gift', date: '05 Dec, 2021', type: 'income', amount: '100.00' }
-    ];
+import Sidebar from "@/app/components/sidebar";
+import "./Tran.css";
+import { useState } from "react";
 
-    const [transactions, setTransactions] = useState(mockTransactions);
+export default function Transactions() {
+  const [isOpen, setIsOpen] = useState(false);
+  const toggleSidebar = () => setIsOpen(!isOpen);
 
-    return (
-        <div>
-            <header>
-                <h1>Recent Transactions</h1>
-                <p>ดูธุรกรรมล่าสุดของคุณ</p>
-            </header>
-            <div className="transaction-section">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Category/Note</th>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {transactions.map((transaction, index) => (
-                            <tr key={index}>
-                                <td className="category-note">{transaction.category} / {transaction.note}</td>
-                                <td className="date">{transaction.date}</td>
-                                <td className={`type-${transaction.type}`}>
-                                    {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                                </td>
-                                <td className={transaction.type === 'income' ? 'income-amount' : 'expense-amount'}>
-                                    {transaction.amount}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                <p className="data-date">
-                    ข้อมูล ณ วันที่ {new Date().toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'long', year: 'numeric' })}
-                </p>
-            </div>
+  return (
+    <div className="transaction-content">
+      {/* Sidebar บนสุด */}
+      <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
+
+      {/* Topbar + ปุ่ม toggle */}
+      <header className="fc-topbar">
+        <div className="fc-title">
+          <button onClick={toggleSidebar}>
+            <img src="/hamburger.png" alt="icon-ham" className="transaction-iconham" />
+          </button>
+          <h1>Recent Transactions</h1>
+          <p>ดูธุรกรรมล่าสุดของคุณ</p>
         </div>
-    );
-};
+      </header>
 
-export default TransactionsPage;
+      {/* Main content */}
+      <div className="transaction-section">
+        <table>
+          <thead>
+            <tr>
+              <th>Category/Note</th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                Suki Tei <br />
+                <span className="text-gray-500">Foods and Groceries</span>
+              </td>
+              <td>03 Jan, 2022</td>
+              <td className="expense">Expense</td>
+              <td className="expense">-549.90</td>
+            </tr>
+            <tr>
+              <td>
+                KFC <br />
+                <span className="text-gray-500">Foods and Groceries</span>
+              </td>
+              <td>01 Jan, 2022</td>
+              <td className="expense">Expense</td>
+              <td className="expense">-238.90</td>
+            </tr>
+            <tr>
+              <td>
+                Spotify <br />
+                <span className="text-gray-500">Foods and Groceries</span>
+              </td>
+              <td>31 Dec, 2021</td>
+              <td className="expense">Expense</td>
+              <td className="expense">-283.90</td>
+            </tr>
+            <tr>
+              <td>
+                Mom give <br />
+                <span className="text-gray-500">Gift</span>
+              </td>
+              <td>24 Dec, 2021</td>
+              <td className="income">Income</td>
+              <td className="income">237.90</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

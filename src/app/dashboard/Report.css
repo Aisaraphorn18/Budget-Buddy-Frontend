@@ -86,9 +86,9 @@ body{
 }
  
 /* กล่องเนื้อหาตรงกลางของหน้า dashboard */
-.content{
+.dashboard-content{
   width:100%;
-  max-width:960px;
+  max-width: auto;
   background:var(--card);
   border-radius:18px;
   box-shadow:var(--shadow);
@@ -137,16 +137,24 @@ body{
   grid-template-columns: repeat(12, minmax(0,1fr));
   gap:12px;
   padding:8px 6px 0;
-  height:280px;           /* ความสูงกราฟ */
-  align-items:end;        /* ให้แท่งชิดล่าง */
+  height:280px;           
+  align-items:end;
 }
-.bar-col{display:flex; flex-direction:column; align-items:center; gap:6px}
-.bar-stack{display:flex; gap:6px; align-items:flex-end; height:100%}
+.bar-col{display:flex; flex-direction:column; align-items:center; gap:6px; height:100%;}
+.bar-stack{display:flex; gap:6px; align-items:flex-end; height:100%; flex:1;}
 .bar{width:14px; border-radius:6px 6px 0 0; display:block}
 .bar.income{background:#16a34a}
 .bar.expense{background:#e11d48}
 .bar-label{font-size:.8rem; color:#6b7280}
  
+/*.bar {
+  width:14px;
+  border-radius:6px 6px 0 0;
+  display:block;
+  border:1px solid black !important;} */
+
+
+
 /* mini totals under chart */
 .totals-row{display:flex; gap:10px; justify-content:center; margin:12px 0 4px}
 .mini-total{display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--ring); border-radius:10px; padding:8px 10px}
@@ -172,9 +180,6 @@ body{
   .donut-hole{width:140px; height:140px}
   .fc-total{width:100%; max-width:none}
 }
- 
- 
-/* (สไตล์ Home อื่น ๆ ของคุณ สามารถคงไว้ได้) */
  
 /* Responsive */
 @media (max-width: 800px){
