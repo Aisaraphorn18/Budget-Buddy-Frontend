@@ -1,71 +1,89 @@
 "use client";
 import "./Report.css";
 import Sidebar from "@/app/components/sidebar";
-
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import axios from "axios";
 
 const COLORS = ["#6E47E8", "#10B981", "#f59e0b", "#ef4444"];
-
-const categoryData = [
-  { key: "Investment", amount: 1912.5, color: COLORS[0], icon: "📈" },
-  { key: "Food", amount: 1912.5, color: COLORS[1], icon: "🍽️" },
-  { key: "Shopping", amount: 1912.5, color: COLORS[2], icon: "🧾" },
-  { key: "Others", amount: 1912.5, color: COLORS[3], icon: "⋯" },
-];
-
-const monthly = [
-  { m: "Jan", income: 2200, expense: 1800 },
-  { m: "Feb", income: 1800, expense: 1600 },
-  { m: "Mar", income: 2100, expense: 1400 },
-  { m: "Apr", income: 2000, expense: 1500 },
-  { m: "May", income: 1950, expense: 1550 },
-  { m: "Jun", income: 2050, expense: 1600 },
-  { m: "Jul", income: 2600, expense: 2000 },
-  { m: "Aug", income: 2500, expense: 2300 },
-  { m: "Sep", income: 2400, expense: 1500 },
-  { m: "Oct", income: 2300, expense: 2100 },
-  { m: "Nov", income: 2350, expense: 2200 },
-  { m: "Dec", income: 2450, expense: 2300 },
-];
 
 export default function DashboardContent() {
   const [view, setView] = useState("summary");
   const [chartType, setChartType] = useState("income-expense");
   const [range, setRange] = useState("year");
 
-  const totalCat = useMemo(
-    () => categoryData.reduce((s, d) => s + d.amount, 0),
-    []
-  );
+  const [categoryData, setCategoryData] = useState([]);
+  const [monthly, setMonthly] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError("");
+      try {
+        const token = localStorage.getItem("token");
+        const headers = {
+          headers: { Authorization: token ? `Bearer ${token}` : "" },
+        };
+
+        // Fetch expenses by category
+        const catRes = await axios.get(
+          "http://localhost:4000/protected/api/v1/reports/expenses-by-category",
+          headers
+        );
+        const catDataRaw = catRes.data.data || catRes.data || [];
+
+        const catData = catDataRaw.map((c, i) => ({
+          key: c.category || c.key || `Category${i + 1}`,
+          amount: Number(c.amount || 0),
+          color: COLORS[i % COLORS.length],
+          icon: c.icon || ["📈", "🍽️", "🧾", "⋯"][i % 4],
+        }));
+        setCategoryData(catData);
+
+        // Fetch income vs expense monthly data
+        const ieRes = await axios.get(
+          "http://localhost:4000/protected/api/v1/reports/income-vs-expense",
+          headers
+        );
+        const ieRaw = ieRes.data.data || ieRes.data || [];
+
+        const monthlyData = ieRaw.map((d) => ({
+          m: d.month || d.m || "N/A",
+          income: Number(d.income || 0),
+          expense: Number(d.expense || 0),
+        }));
+        setMonthly(monthlyData);
+      } catch (e) {
+        setError(e.response?.data?.message || e.message || "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const totalCat = useMemo(() => categoryData.reduce((sum, d) => sum + d.amount, 0), [categoryData]);
 
   const parts = useMemo(() => {
     let acc = 0;
     return categoryData.map((d) => {
-      const pct = (d.amount / totalCat) * 100;
+      const pct = totalCat > 0 ? (d.amount / totalCat) * 100 : 0;
       const from = acc;
       const to = acc + pct;
       acc = to;
       return { ...d, pct, from, to };
     });
-  }, [totalCat]);
+  }, [categoryData, totalCat]);
 
   const donutGradient = useMemo(() => {
     const stops = parts.map((p) => `${p.color} ${p.from}% ${p.to}%`).join(", ");
     return `conic-gradient(${stops})`;
   }, [parts]);
 
-  const maxY = useMemo(
-    () => Math.max(...monthly.flatMap((x) => [x.income, x.expense])),
-    []
-  );
-  const totalIncome = useMemo(
-    () => monthly.reduce((s, x) => s + x.income, 0),
-    []
-  );
-  const totalExpense = useMemo(
-    () => monthly.reduce((s, x) => s + x.expense, 0),
-    []
-  );
+  const maxY = useMemo(() => Math.max(...monthly.flatMap((x) => [x.income, x.expense]), 0), [monthly]);
+  const totalIncome = useMemo(() => monthly.reduce((s, x) => s + x.income, 0), [monthly]);
+  const totalExpense = useMemo(() => monthly.reduce((s, x) => s + x.expense, 0), [monthly]);
 
   const asOf = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -107,10 +125,7 @@ export default function DashboardContent() {
 
         <div className="fc-filters">
           <div className="fc-filter">
-            <select
-              value={chartType}
-              onChange={(e) => setChartType(e.target.value)}
-            >
+            <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
               <option value="income-expense">Income & Expense Chart</option>
               <option value="income">Income Only</option>
               <option value="expense">Expense Only</option>
@@ -125,7 +140,10 @@ export default function DashboardContent() {
         </div>
       </div>
 
-      {view === "summary" && (
+      {loading && <p>Loading data...</p>}
+      {error && <p className="error">{error}</p>}
+
+      {view === "summary" && !loading && !error && (
         <>
           <section className="fc-board">
             <div className="bar-head">
@@ -133,19 +151,13 @@ export default function DashboardContent() {
             </div>
             <div className="bars-wrap">
               {monthly.map((x) => {
-                const ih = Math.round((x.income / maxY) * 100);
-                const eh = Math.round((x.expense / maxY) * 100);
+                const ih = maxY > 0 ? Math.round((x.income / maxY) * 100) : 0;
+                const eh = maxY > 0 ? Math.round((x.expense / maxY) * 100) : 0;
                 return (
                   <div className="bar-col" key={x.m} title={x.m}>
                     <div className="bar-stack">
-                      <div
-                        className="bar income"
-                        style={{ height: `${Math.max(ih, 5)}%` }}
-                      ></div>
-                      <div
-                        className="bar expense"
-                        style={{ height: `${Math.max(eh, 5)}%` }}
-                      ></div>
+                      <div className="bar income" style={{ height: `${Math.max(ih, 5)}%` }}></div>
+                      <div className="bar expense" style={{ height: `${Math.max(eh, 5)}%` }}></div>
                     </div>
                     <div className="bar-label">{x.m}</div>
                   </div>
@@ -158,36 +170,29 @@ export default function DashboardContent() {
                 <span className="mini-ic">🐷</span>
                 <div className="mini-meta">
                   <div className="mini-title">Total Income (Baht)</div>
-                  <div className="mini-value">
-                    ฿{totalIncome.toLocaleString()}
-                  </div>
+                  <div className="mini-value">฿{totalIncome.toLocaleString()}</div>
                 </div>
               </div>
               <div className="mini-total">
                 <span className="mini-ic">🐷</span>
                 <div className="mini-meta">
                   <div className="mini-title">Total Expenses (Baht)</div>
-                  <div className="mini-value">
-                    ฿{totalExpense.toLocaleString()}
-                  </div>
+                  <div className="mini-value">฿{totalExpense.toLocaleString()}</div>
                 </div>
               </div>
             </div>
 
-            <div className="fc-sub">
-              Income & Expense Summary (January 2024 - December 2024)
-            </div>
+            <div className="fc-sub">Income & Expense Summary (January 2024 - December 2024)</div>
             <div className="fc-date">Data as of {asOf}</div>
           </section>
 
           <section className="month-list">
             <h4 className="year-title">2024</h4>
-            {["Dec", "Nov", "Oct"].map((mm) => {
-              const row = monthly.find((x) => x.m.startsWith(mm)) ?? monthly[0];
+            {monthly.map((row) => {
               const net = row.income - row.expense;
               return (
-                <div className="month-card" key={mm}>
-                  <div className="month-head">{mm} 24</div>
+                <div className="month-card" key={row.m}>
+                  <div className="month-head">{row.m} 24</div>
                   <div className="month-line">
                     <span>Total Income :</span>
                     <b className="green">{row.income.toFixed(2)} Baht</b>
@@ -198,9 +203,7 @@ export default function DashboardContent() {
                   </div>
                   <div className="month-line">
                     <span>Net Balance :</span>
-                    <b className={net >= 0 ? "green" : "red"}>
-                      {net.toFixed(2)} Baht
-                    </b>
+                    <b className={net >= 0 ? "green" : "red"}>{net.toFixed(2)} Baht</b>
                   </div>
                 </div>
               );
@@ -209,7 +212,7 @@ export default function DashboardContent() {
         </>
       )}
 
-      {view === "category" && (
+      {view === "category" && !loading && !error && (
         <>
           <section className="fc-board">
             <div className="fc-chart">
@@ -235,31 +238,26 @@ export default function DashboardContent() {
               <div className="pig">🐷</div>
               <div className="meta">
                 <div className="label">Total Expenses (Baht)</div>
-                <div className="value">
-                  ฿{(totalCat * 443).toLocaleString("en-US")}
-                </div>
+                <div className="value">฿{totalCat.toLocaleString("en-US")}</div>
               </div>
             </div>
 
             <div className="fc-date">Data as of {asOf}</div>
           </section>
 
-          {/* 🔹 แก้ตรงนี้: แยก section ต่อปุ่ม */}
           {parts.map((p) => (
             <section className="fc-list" key={p.key}>
               <button className="row">
                 <div className="left">
                   <div className="badge" style={{ background: "#F3F4F6" }}>
-                    <span className="emoji">
-                      {categoryData.find((c) => c.key === p.key)?.icon}
-                    </span>
+                    <span className="emoji">{categoryData.find((c) => c.key === p.key)?.icon}</span>
                   </div>
                   <div className="name">{p.key}</div>
                 </div>
                 <div className="right">
                   <div className="meta">
-                    <span className="amount">11912.50 Baht</span>
-                    <span className="percent">25.0%</span>
+                    <span className="amount">{p.amount.toFixed(2)} Baht</span>
+                    <span className="percent">{p.pct.toFixed(1)}%</span>
                   </div>
                   <span className="chev">›</span>
                 </div>
