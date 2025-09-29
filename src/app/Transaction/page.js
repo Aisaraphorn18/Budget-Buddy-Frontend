@@ -16,8 +16,35 @@ const readTheme = () => {
 };
 const applyTheme = (mode) => {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", mode === "dark"); // ✅ toggle ที่ root
+  document.documentElement.classList.toggle("dark", mode === "dark");
   localStorage.setItem(THEME_KEY, mode);
+};
+
+/* ===== Helpers ===== */
+const pad2 = (n) => String(n).padStart(2, "0");
+const toYM = (y, m1to12) => `${y}-${pad2(m1to12)}`;
+const ymShort = (ym) => new Date(ym + "-01").toLocaleString("en-US", { month: "short" });
+const last6Months = (endYM /* YYYY-MM */) => {
+  const [y, m] = endYM.split("-").map(Number);
+  const base = new Date(y, m - 1, 1);
+  const arr = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+    arr.push(toYM(d.getFullYear(), d.getMonth() + 1));
+  }
+  return arr;
+};
+const last6MonthsOptions = () => last6Months(new Date().toISOString().slice(0, 7));
+
+const pickItems = (payload) => {
+  const d = payload?.data ?? payload;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.items)) return d.items;
+  if (Array.isArray(d?.transactions)) return d.transactions;
+  if (Array.isArray(d?.data)) return d.data;
+  if (Array.isArray(d?.data?.items)) return d.data.items;
+  if (Array.isArray(d?.data?.transactions)) return d.data.transactions;
+  return [];
 };
 
 export default function Transactions() {
@@ -25,8 +52,6 @@ export default function Transactions() {
   const [dark, setDark] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const toggleSidebar = () => setIsOpen((v) => !v);
-
-  // ทำให้ธีมคงอยู่และอ่านเหมือนหน้า Home
   useLayoutEffect(() => {
     const mode = readTheme();
     applyTheme(mode);
@@ -38,12 +63,14 @@ export default function Transactions() {
     setDark(checked);
   };
 
+  // ----- Filters -----
+  const [monthISO, setMonthISO] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const monthOptions = useMemo(() => last6MonthsOptions(), []);
+
   // ----- Data -----
-  const [items, setItems] = useState([]);
+  const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState("");
-
-  const params = useMemo(() => ({}), []);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -58,44 +85,37 @@ export default function Transactions() {
           },
         };
 
-        const txReq  = axios.get("http://localhost:4000/protected/api/v1/transactions", { ...auth, params });
+        // ส่งพารามิเตอร์ month เสมอ เพื่อขอข้อมูลของเดือนที่เลือก
+        const txReq  = axios.get("http://localhost:4000/protected/api/v1/transactions", { ...auth, params: { month: monthISO } });
         const catReq = axios.get("http://localhost:4000/protected/api/v1/categories", auth);
 
         const [txRes, catRes] = await Promise.all([txReq, catReq]);
 
         // build category map
-        const catPayload = catRes?.data;
-        const catList = Array.isArray(catPayload?.data)
-          ? catPayload.data
-          : Array.isArray(catPayload)
-          ? catPayload
-          : [];
+        const catList = pickItems(catRes);
         const catMap = {};
         for (const c of catList) {
           const id   = c.category_id ?? c.id ?? c._id ?? c.cid;
           const name = c.category_name ?? c.name ?? c.title ?? c.label ?? (id != null ? `Category ${id}` : "—");
-          if (id != null) catMap[id] = name;
+          if (id != null) catMap[String(id)] = name;
         }
 
-        // normalize transactions
-        const txPayload = txRes?.data;
-        if (txPayload?.success === false) throw new Error(txPayload?.message || "Failed to fetch transactions");
-        const list = Array.isArray(txPayload?.data) ? txPayload.data : [];
-
+        // normalize transactions (รองรับหลาย payload shapes)
+        const list = pickItems(txRes);
         const normalized = list.map((t) => {
           const isIncome = String(t.type).toLowerCase() === "income";
           const categoryName =
             t.category_name ??
             t.categoryName ??
             t.category?.name ??
-            (t.category_id != null ? catMap[t.category_id] : undefined) ??
+            (t.category_id != null ? catMap[String(t.category_id)] : undefined) ??
             "—";
           const note = t.note ? ` / ${t.note}` : "";
           const amountNum = Number(t.amount || 0);
 
           return {
             category: `${categoryName}${note}`,
-            date: formatDate(t.created_at ?? t.date ?? t.txn_date),
+            date: formatDate(t.transaction_date ?? t.created_at ?? t.date ?? t.txn_date),
             type: isIncome ? "Income" : "Expenses",
             amount: isIncome ? amountNum : -Math.abs(amountNum),
           };
@@ -110,14 +130,12 @@ export default function Transactions() {
     };
 
     fetchAll();
-  }, [params]);
+  }, [monthISO]);
 
   return (
     <div className="app transactions-page">
-      {/* Sidebar */}
       <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
-      {/* Main */}
       <main className="main">
         <header className="page-head">
           <button onClick={toggleSidebar} aria-label="Toggle sidebar" className="icon-btn">
@@ -126,15 +144,26 @@ export default function Transactions() {
 
           <h1 className="page-title">Recent Transactions</h1>
 
-          {/* dark mode switch — ใช้ตัวเดียวกับ Home */}
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={dark}
-              onChange={(e) => onToggleTheme(e.target.checked)}
-            />
-            <span className="toggle-slider">{dark ? "🌙" : "☀️"}</span>
-          </label>
+          {/* month filter (ย้อนหลัง 6 เดือน) */}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
+            <select
+              className="input"
+              value={monthISO}
+              onChange={(e) => setMonthISO(e.target.value)}
+              aria-label="Select month (last 6 months)"
+            >
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {ymShort(m)} {m.slice(0,4)}
+                </option>
+              ))}
+            </select>
+
+            <label className="toggle">
+              <input type="checkbox" checked={dark} onChange={(e) => onToggleTheme(e.target.checked)} />
+              <span className="toggle-slider">{dark ? "🌙" : "☀️"}</span>
+            </label>
+          </div>
         </header>
 
         <div className="table-wrapper">
@@ -167,8 +196,8 @@ export default function Transactions() {
                   <td data-label="Type">{t.type}</td>
                   <td data-label="Amount" className={t.amount > 0 ? "income" : "expense"}>
                     {t.amount > 0
-                      ? `$${t.amount.toFixed(2)}`
-                      : `- $${Math.abs(t.amount).toFixed(2)}`}
+                      ? `฿${t.amount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : `- ฿${Math.abs(t.amount).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </td>
                 </tr>
               ))}
@@ -180,7 +209,6 @@ export default function Transactions() {
   );
 }
 
-// ---------- helpers ----------
 function formatDate(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
