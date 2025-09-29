@@ -9,7 +9,11 @@
   --green:#10b981;
   --red:#ef4444;
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* Dark mode */
 body.dark {
   --bg:#1f2937;
@@ -17,7 +21,11 @@ body.dark {
   --txt:#f3f4f6;
   --muted:#9ca3af;
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* ===== Sidebar ===== */
 .sidebar{
   position: fixed;           /* แทน sticky */
@@ -36,7 +44,11 @@ body.dark {
 .sidebar.open{
   transform: translateX(0);         /* เปิด */
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 .btn-back{
   position: absolute;
   top: 10px;
@@ -47,18 +59,31 @@ body.dark {
   padding: 6px;              /* ขยายพื้นที่คลิกให้แม่น */
   line-height: 0;            /* กันช่องว่างแนวตั้ง */
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 .iconback{
   width: 18px;
   height: 18px;
   display: block;
 }
+<<<<<<< HEAD
  
  
 .brand{
   display:flex;
   align-items:center;
   gap:12px;
+=======
+
+
+.brand{
+  display:flex; 
+  align-items:center; 
+  gap:12px; 
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
   padding:6px 10px
 }
 .brand img{
@@ -68,10 +93,17 @@ body.dark {
   box-shadow:var(--shadow)
 }
 .brand span{
+<<<<<<< HEAD
   font-weight:800;
   color: var(--txt)
 }
  
+=======
+  font-weight:800; 
+  color: var(--txt)
+}
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* ลดขนาด hamburger */
 .brand img.hamburger {
   width: 24px;
@@ -79,7 +111,11 @@ body.dark {
   box-shadow: none;
   border-radius: 0;
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 .nav{display:flex; flex-direction:column; gap:8px}
 .nav-item{
   display:flex; align-items:center; gap:12px; padding:12px 14px;
@@ -90,7 +126,11 @@ body.dark {
 }
 .nav-item.active{outline:2px solid #b13751}
 .nav-ic{font-size:18px}
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 .logout{margin-top:auto}
 .logout-btn{
   width:100%; padding:14px; border-radius:14px;
@@ -101,7 +141,11 @@ body.dark {
 }
 .logout-btn:hover{ background:#c53030; transform:translateY(-1px) }
 .icon{width:20px;height:20px; object-fit:contain}
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* ===== Overlay + Toggle ===== */
 .sb-overlay{
   position: fixed; inset: 0;
@@ -111,7 +155,11 @@ body.dark {
   z-index: 50;
 }
 .sb-overlay.show{ opacity:1; pointer-events:auto; }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* เดสก์ท็อป: ไม่ต้องบังคับ transform อีกต่อไป แค่ซ่อน overlay ก็พอ */
 @media (min-width:1025px){
   .sb-overlay{ display: none; }
@@ -124,7 +172,11 @@ body.dark {
   min-height:100vh;
   transition: background .3s ease;
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* Toggle switch */
 .toggle{
   display:flex; align-items:center; gap:6px;
@@ -135,7 +187,11 @@ body.dark {
 .toggle-slider{
   cursor:pointer;
 }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* Summary cards */
 .summary{
   display:flex; gap:20px; flex-wrap:wrap;
@@ -154,7 +210,11 @@ body.dark {
 .sum-title{ font-weight:700; color: var(--txt) }
 .sum-value{ font-size:1.5rem; font-weight:700; color: var(--txt) }
 .icon{ width:24px; height:24px; }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
 /* Budget */
 .budget-header{
   display:flex; justify-content:space-between; align-items:center; margin-top:32px;
@@ -171,4 +231,8 @@ body.dark {
 .bamount{ margin-top:12px; font-weight:700; color: var(--txt) }
 .bamount .muted{ font-weight:400; color: var(--muted); margin-left:4px; }
 .progress{ height:8px; background:var(--ring); border-radius:8px; margin-top:8px; }
+<<<<<<< HEAD
 .progress .bar{ height:100%; background:var(--green); border-radius:8px; }
+=======
+.progress .bar{ height:100%; background:var(--green); border-radius:8px; }
+>>>>>>> efd6983574aa0e53b35bee29d8375298b83b911b
