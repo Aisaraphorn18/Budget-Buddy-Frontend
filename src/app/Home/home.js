@@ -7,7 +7,7 @@ import Sidebar from "@/app/components/sidebar";
 import api from "@/app/lib/axiosClient";
 import "./home.css";
 
-/* ========= THEME (คงอยู่ข้ามหน้า) ========= */
+/* ========= THEME ========= */
 const THEME_KEY = "theme";
 const readTheme = () => {
   if (typeof window === "undefined") return "light";
@@ -52,6 +52,13 @@ export default function Home() {
     setDark(checked);
   };
 
+  /* ===== Month (สำหรับสรุป/กรอง) ===== */
+  const [monthISO] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const isInSelectedMonth = useCallback(
+    (t) => String(t.date ?? t.transaction_date ?? t.created_at ?? "").slice(0, 7) === monthISO,
+    [monthISO]
+  );
+
   /* ===== Data ===== */
   const [income, setIncome] = useState(0);
   const [expenses, setExpenses] = useState(0);
@@ -79,26 +86,47 @@ export default function Home() {
   const [deletingId, setDeletingId] = useState("");
 
   /* ===== Forms ===== */
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(0); // number
   const [amount, setAmount] = useState("");
   const firstInputRef = useRef(null);
 
-  const [txnDate, setTxnDate] = useState(() => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  });
+  // ⬇️ “วันนี้” และล็อกไว้
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [txnDate, setTxnDate] = useState(todayISO);
   const [txnType, setTxnType] = useState("");
-  const [txnCategory, setTxnCategory] = useState("");
+  const [txnCategory, setTxnCategory] = useState(0); // number
   const [txnAmount, setTxnAmount] = useState("");
   const [txnNote, setTxnNote] = useState("");
   const [txnSaving, setTxnSaving] = useState(false);
 
+  /* ===== Active budgets / filters ===== */
+  const activeBudgetCatIds = useMemo(() => {
+    const s = new Set();
+    for (const b of budgets) s.add(String(b.category_id ?? b.id ?? ""));
+    return s;
+  }, [budgets]);
+
+  const monthTxns = useMemo(() => txns.filter(isInSelectedMonth), [txns, isInSelectedMonth]);
+
+  const filteredExpenseTxns = useMemo(
+    () =>
+      monthTxns.filter((t) => {
+        const type = String(t.type ?? "").toLowerCase();
+        const catId = String(t.category_id ?? t.categoryId ?? "");
+        return type === "expense" && activeBudgetCatIds.has(catId);
+      }),
+    [monthTxns, activeBudgetCatIds]
+  );
+
+  const filteredIncomeTxns = useMemo(
+    () => monthTxns.filter((t) => String(t.type ?? "").toLowerCase() === "income"),
+    [monthTxns]
+  );
+
   /* ===== Derived ===== */
   const spentByCat = useMemo(() => {
     const map = {};
-    for (const t of txns) {
-      if ((t.type ?? "").toLowerCase() !== "expense") continue;
+    for (const t of filteredExpenseTxns) {
       const catId = (t.category_id ?? t.categoryId ?? "").toString();
       const amt = Number(t.amount) || 0;
       const d = t.created_at ?? t.date ?? null;
@@ -109,7 +137,7 @@ export default function Home() {
       }
     }
     return map;
-  }, [txns]);
+  }, [filteredExpenseTxns]);
 
   const catName = useCallback(
     (id) => {
@@ -129,19 +157,6 @@ export default function Home() {
   );
 
   /* ===== Load all ===== */
-  const refreshSummaryFromTxns = (list) => {
-    let inc = 0,
-      exp = 0;
-    for (const t of list) {
-      const amt = Number(t.amount) || 0;
-      const type = (t.type ?? "").toLowerCase();
-      if (type === "income") inc += amt;
-      else if (type === "expense") exp += amt;
-    }
-    setIncome(inc);
-    setExpenses(exp);
-  };
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     setBudError("");
@@ -151,8 +166,9 @@ export default function Home() {
       const [catsRes, budRes, txnRes] = await Promise.all([
         api.get("/protected/api/v1/categories"),
         api.get("/protected/api/v1/budgets"),
-        api.get("/protected/api/v1/transactions"),
+        api.get("/protected/api/v1/transactions", { params: { month: monthISO } }),
       ]);
+
       const cats = pickItems(catsRes);
       const buds = pickItems(budRes);
       const txs = pickItems(txnRes);
@@ -160,12 +176,22 @@ export default function Home() {
       setCategories(cats);
       setBudgets(buds);
       setTxns(txs);
-      refreshSummaryFromTxns(txs);
 
-      const firstId =
-        cats.length > 0 ? (cats[0].category_id ?? cats[0].id)?.toString() ?? "" : "";
-      setSelectedCategory(firstId || "");
-      setTxnCategory(firstId || "");
+      // ตั้ง default ครั้งแรก
+      if (!selectedCategory && cats[0]) {
+        const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
+        setSelectedCategory(firstId);
+      }
+      if (!txnCategory && cats[0]) {
+        const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
+        setTxnCategory(firstId);
+      }
+
+      // คำนวณสรุป
+      const inc = filteredIncomeTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const exp = filteredExpenseTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      setIncome(inc);
+      setExpenses(exp);
     } catch (err) {
       console.error("loadAll error:", err);
       const msg = axios.isAxiosError(err) ? err.response?.data?.message : null;
@@ -175,11 +201,11 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [monthISO, filteredIncomeTxns, filteredExpenseTxns, selectedCategory, txnCategory]);
 
   useEffect(() => {
     loadAll();
-    const onFocus = () => loadAll(); // กลับมาหน้านี้แล้ว sync ใหม่
+    const onFocus = () => loadAll();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [loadAll]);
@@ -187,11 +213,10 @@ export default function Home() {
   /* ===== Actions ===== */
   const createBudget = async () => {
     try {
-      const cycleMonth = new Date().toISOString().slice(0, 7);
       await api.post("/protected/api/v1/budgets", {
         category_id: Number(selectedCategory),
         budget_amount: Number(amount),
-        cycle_month: cycleMonth,
+        cycle_month: monthISO,
       });
       setShowBudgetModal(false);
       setAmount("");
@@ -210,13 +235,24 @@ export default function Home() {
     try {
       setTxnSaving(true);
       setTxnError("");
+
+      // ⛔️ บังคับว่าต้องมี Budget สำหรับ category ที่เลือก (ไม่ว่าจะ income/expense)
+      const hasBudget = activeBudgetCatIds.has(String(txnCategory));
+      if (!hasBudget) {
+        setTxnSaving(false);
+        return setTxnError("ไม่สามารถบันทึกธุรกรรมได้ เพราะหมวดนี้ยังไม่มี Budget");
+      }
+
+      const today = todayISO; // วันนี้เสมอ
+
       await api.post("/protected/api/v1/transactions", {
         category_id: Number(txnCategory),
         type: txnType,
         amount: Number(txnAmount),
         note: txnNote || "",
-        date: txnDate,
+        date: today, // fixed วันนี้
       });
+
       setShowTxnModal(false);
       setTxnAmount("");
       setTxnNote("");
@@ -244,7 +280,7 @@ export default function Home() {
       setDeletingId(String(confirm.id));
       await api.delete(`/protected/api/v1/budgets/${confirm.id}`);
       setConfirm(null);
-      await loadAll(); // summary ไม่ต้องคำนวณใหม่เอง เพราะไม่ได้เปลี่ยน txns
+      await loadAll();
     } catch (err) {
       console.error("Delete budget error:", err);
       alert(
@@ -257,14 +293,13 @@ export default function Home() {
     }
   };
 
-  // ----- Edit Budget -----
   const openEdit = (b) => {
     const id = b.budget_id ?? b.id;
     setEdit({
       id,
       category_id: String(b.category_id ?? ""),
       budget_amount: String(b.budget_amount ?? ""),
-      cycle_month: b.cycle_month ?? new Date().toISOString().slice(0, 7),
+      cycle_month: b.cycle_month ?? monthISO,
     });
   };
 
@@ -272,7 +307,7 @@ export default function Home() {
     if (!edit) return;
     try {
       setSavingEdit(true);
-      await api.put(`/protected/api/v1/budgets/:id`, {
+      await api.put(`/protected/api/v1/budgets/${edit.id}`, {
         category_id: Number(edit.category_id),
         budget_amount: Number(edit.budget_amount),
         cycle_month: edit.cycle_month,
@@ -305,11 +340,7 @@ export default function Home() {
           <h1>My Wallet</h1>
 
           <label className="toggle" style={{ marginLeft: "auto" }}>
-            <input
-              type="checkbox"
-              checked={dark}
-              onChange={(e) => toggleTheme(e.target.checked)}
-            />
+            <input type="checkbox" checked={dark} onChange={(e) => toggleTheme(e.target.checked)} />
             <span className="toggle-slider">{dark ? "🌙" : "☀️"}</span>
           </label>
         </header>
@@ -350,13 +381,13 @@ export default function Home() {
             <button
               className="btn btn-green"
               onClick={() => {
-                setTxnDate(new Date().toISOString().slice(0, 10));
+                // เปิดโมดัลเพิ่มธุรกรรม: ล็อกวันที่เป็นวันนี้
+                setTxnDate(todayISO);
                 setTxnType("");
-                const firstId =
-                  categories[0]
-                    ? (categories[0].category_id ?? categories[0].id)?.toString() ?? ""
-                    : "";
-                setTxnCategory(firstId);
+                if (!txnCategory && categories[0]) {
+                  const firstId = Number(categories[0].category_id ?? categories[0].id ?? 0);
+                  setTxnCategory(firstId);
+                }
                 setTxnAmount("");
                 setTxnNote("");
                 setTxnError("");
@@ -370,11 +401,10 @@ export default function Home() {
               className="btn btn-red"
               onClick={() => {
                 setAmount("");
-                const firstId =
-                  categories[0]
-                    ? (categories[0].category_id ?? categories[0].id)?.toString() ?? ""
-                    : "";
-                setSelectedCategory(firstId);
+                if (!selectedCategory && categories[0]) {
+                  const firstId = Number(categories[0].category_id ?? categories[0].id ?? 0);
+                  setSelectedCategory(firstId);
+                }
                 setShowBudgetModal(true);
               }}
             >
@@ -385,9 +415,7 @@ export default function Home() {
 
         {/* ===== Budget grid ===== */}
         <section className="budget-grid">
-          {loading && budgetsView.length === 0 && (
-            <div className="muted">กำลังโหลดข้อมูล…</div>
-          )}
+          {loading && budgetsView.length === 0 && <div className="muted">กำลังโหลดข้อมูล…</div>}
           {budError && <div className="error">{budError}</div>}
           {!loading && !budError && budgetsView.length === 0 && (
             <div className="muted">ยังไม่มี Budget</div>
@@ -446,20 +474,12 @@ export default function Home() {
                   <div className="bamount">
                     ฿{baht(spent)} <span className="muted">/ {baht(max)}</span>
                   </div>
-                  <span
-                    className={"pct-badge " + (pct >= 100 ? "danger" : pct >= 80 ? "warn" : "")}
-                  >
+                  <span className={"pct-badge " + (pct >= 100 ? "danger" : pct >= 80 ? "warn" : "")}>
                     {pct}%
                   </span>
                 </div>
 
-                <div
-                  className="progress"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={pct}
-                >
+                <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
                   <div className="bar" style={barStyle} />
                 </div>
               </div>
@@ -469,10 +489,7 @@ export default function Home() {
 
         {/* ===== Create Budget Modal ===== */}
         {showBudgetModal && (
-          <div
-            className="modal-overlay"
-            onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}
-          >
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}>
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Create Budget</h3>
@@ -482,13 +499,13 @@ export default function Home() {
                   <label>Category</label>
                   <select
                     className="input"
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    value={String(selectedCategory || 0)}
+                    onChange={(e) => setSelectedCategory(Number(e.target.value))}
                   >
                     {categories.length === 0 && <option disabled>No categories</option>}
                     {categories.map((c) => {
-                      const id = (c.category_id ?? c.id)?.toString();
-                      const name = c.category_name ?? c.name ?? `Category ${id ?? ""}`;
+                      const id = Number(c.category_id ?? c.id ?? 0);
+                      const name = c.category_name ?? c.name ?? `Category ${id || ""}`;
                       return (
                         <option key={id} value={id}>
                           {name}
@@ -540,7 +557,7 @@ export default function Home() {
                   <label>Category</label>
                   <select
                     className="input"
-                    value={edit.category_id}
+                    value={String(edit.category_id)}
                     onChange={(e) => setEdit((x) => ({ ...x, category_id: e.target.value }))}
                   >
                     {categories.length === 0 && <option disabled>No categories</option>}
@@ -564,9 +581,7 @@ export default function Home() {
                     min="0"
                     step="0.01"
                     value={edit.budget_amount}
-                    onChange={(e) =>
-                      setEdit((x) => ({ ...x, budget_amount: e.target.value }))
-                    }
+                    onChange={(e) => setEdit((x) => ({ ...x, budget_amount: e.target.value }))}
                   />
                 </div>
 
@@ -584,12 +599,7 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-purple"
-                    disabled={
-                      savingEdit ||
-                      !edit.category_id ||
-                      !edit.budget_amount ||
-                      Number(edit.budget_amount) <= 0
-                    }
+                    disabled={savingEdit || !edit.category_id || !edit.budget_amount || Number(edit.budget_amount) <= 0}
                     onClick={updateBudget}
                   >
                     {savingEdit ? "Saving..." : "Save"}
@@ -634,40 +644,33 @@ export default function Home() {
 
         {/* ===== Add Transaction Modal ===== */}
         {showTxnModal && (
-          <div
-            className="modal-overlay"
-            onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}
-          >
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}>
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Add Transaction</h3>
               </div>
               <div className="modal-body">
-                {txnError && (
-                  <div className="error" style={{ marginBottom: 12 }}>
-                    {txnError}
-                  </div>
-                )}
+                {txnError && <div className="error" style={{ marginBottom: 12 }}>{txnError}</div>}
+
                 <div className="form-grid-2">
                   <div className="form-row">
+                    {/* 🔒 ล็อกเป็น "วันนี้" แก้ไม่ได้/คลิกไม่ได้ */}
                     <input
                       ref={firstInputRef}
                       type="date"
                       className="input"
-                      value={txnDate}
-                      onChange={(e) => setTxnDate(e.target.value)}
+                      value={todayISO}
+                      readOnly
+                      onKeyDown={(e) => e.preventDefault()}
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{ cursor: "not-allowed", background: "var(--panel)" }}
+                      title="Fixed to today"
                     />
                   </div>
 
                   <div className="form-row">
-                    <select
-                      className="input"
-                      value={txnType}
-                      onChange={(e) => setTxnType(e.target.value)}
-                    >
-                      <option value="" disabled>
-                        Type
-                      </option>
+                    <select className="input" value={txnType} onChange={(e) => setTxnType(e.target.value)}>
+                      <option value="" disabled>Type</option>
                       <option value="income">Income</option>
                       <option value="expense">Expense</option>
                     </select>
@@ -676,17 +679,15 @@ export default function Home() {
                   <div className="form-row">
                     <select
                       className="input"
-                      value={txnCategory}
-                      onChange={(e) => setTxnCategory(e.target.value)}
+                      value={String(txnCategory || 0)}
+                      onChange={(e) => setTxnCategory(Number(e.target.value))}
                     >
                       {categories.length === 0 && <option disabled>No categories</option>}
                       {categories.map((c) => {
-                        const id = (c.category_id ?? c.id)?.toString();
-                        const name = c.category_name ?? c.name ?? `Category ${id ?? ""}`;
+                        const id = Number(c.category_id ?? c.id ?? 0);
+                        const name = c.category_name ?? c.name ?? `Category ${id || ""}`;
                         return (
-                          <option key={id} value={id}>
-                            {name}
-                          </option>
+                          <option key={id} value={id}>{name}</option>
                         );
                       })}
                     </select>
@@ -724,15 +725,14 @@ export default function Home() {
                       !txnType ||
                       !txnCategory ||
                       !txnAmount ||
-                      Number(txnAmount) <= 0
+                      Number(txnAmount) <= 0 ||
+                      !activeBudgetCatIds.has(String(txnCategory)) // ⛔️ ไม่มี budget ก็ห้ามกด
                     }
                     onClick={addTransaction}
                   >
                     {txnSaving ? "Saving..." : "Add"}
                   </button>
-                  <button type="button" className="btn" onClick={() => setShowTxnModal(false)}>
-                    Cancel
-                  </button>
+                  <button type="button" className="btn" onClick={() => setShowTxnModal(false)}>Cancel</button>
                 </div>
               </div>
             </div>
