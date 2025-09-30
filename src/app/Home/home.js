@@ -86,17 +86,15 @@ export default function Home() {
   const [deletingId, setDeletingId] = useState("");
 
   /* ===== Forms ===== */
-  const [selectedCategory, setSelectedCategory] = useState(0); // <-- number
+  const [selectedCategory, setSelectedCategory] = useState(0); // number
   const [amount, setAmount] = useState("");
   const firstInputRef = useRef(null);
 
-  const [txnDate, setTxnDate] = useState(() => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  });
+  // ⬇️ “วันนี้” และล็อกไว้
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [txnDate, setTxnDate] = useState(todayISO);
   const [txnType, setTxnType] = useState("");
-  const [txnCategory, setTxnCategory] = useState(0); // <-- number
+  const [txnCategory, setTxnCategory] = useState(0); // number
   const [txnAmount, setTxnAmount] = useState("");
   const [txnNote, setTxnNote] = useState("");
   const [txnSaving, setTxnSaving] = useState(false);
@@ -179,7 +177,7 @@ export default function Home() {
       setBudgets(buds);
       setTxns(txs);
 
-      // ตั้งค่า default ให้ครั้งเดียวเมื่อ state ยังว่าง (ไม่ override การเลือกของผู้ใช้)
+      // ตั้ง default ครั้งแรก
       if (!selectedCategory && cats[0]) {
         const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
         setSelectedCategory(firstId);
@@ -216,13 +214,13 @@ export default function Home() {
   const createBudget = async () => {
     try {
       await api.post("/protected/api/v1/budgets", {
-        category_id: Number(selectedCategory),          // <-- ใช้ค่าสำหรับหมวดที่ผู้ใช้เลือก
+        category_id: Number(selectedCategory),
         budget_amount: Number(amount),
         cycle_month: monthISO,
       });
       setShowBudgetModal(false);
       setAmount("");
-      await loadAll();                                  // รีเฟรชหน้า Home (เท่านั้น)
+      await loadAll();
     } catch (err) {
       console.error(err);
       alert(
@@ -238,20 +236,23 @@ export default function Home() {
       setTxnSaving(true);
       setTxnError("");
 
-      const isExpense = String(txnType).toLowerCase() === "expense";
+      // ⛔️ บังคับว่าต้องมี Budget สำหรับ category ที่เลือก (ไม่ว่าจะ income/expense)
       const hasBudget = activeBudgetCatIds.has(String(txnCategory));
-      if (isExpense && !hasBudget) {
+      if (!hasBudget) {
         setTxnSaving(false);
-        return setTxnError("ไม่สามารถบันทึกค่าใช้จ่ายในหมวดนี้ได้ เพราะไม่มี Budget อยู่แล้ว");
+        return setTxnError("ไม่สามารถบันทึกธุรกรรมได้ เพราะหมวดนี้ยังไม่มี Budget");
       }
+
+      const today = todayISO; // วันนี้เสมอ
 
       await api.post("/protected/api/v1/transactions", {
         category_id: Number(txnCategory),
         type: txnType,
         amount: Number(txnAmount),
         note: txnNote || "",
-        date: txnDate,
+        date: today, // fixed วันนี้
       });
+
       setShowTxnModal(false);
       setTxnAmount("");
       setTxnNote("");
@@ -380,7 +381,8 @@ export default function Home() {
             <button
               className="btn btn-green"
               onClick={() => {
-                setTxnDate(new Date().toISOString().slice(0, 10));
+                // เปิดโมดัลเพิ่มธุรกรรม: ล็อกวันที่เป็นวันนี้
+                setTxnDate(todayISO);
                 setTxnType("");
                 if (!txnCategory && categories[0]) {
                   const firstId = Number(categories[0].category_id ?? categories[0].id ?? 0);
@@ -498,7 +500,7 @@ export default function Home() {
                   <select
                     className="input"
                     value={String(selectedCategory || 0)}
-                    onChange={(e) => setSelectedCategory(Number(e.target.value))}  // <-- number
+                    onChange={(e) => setSelectedCategory(Number(e.target.value))}
                   >
                     {categories.length === 0 && <option disabled>No categories</option>}
                     {categories.map((c) => {
@@ -652,12 +654,17 @@ export default function Home() {
 
                 <div className="form-grid-2">
                   <div className="form-row">
+                    {/* 🔒 ล็อกเป็น "วันนี้" แก้ไม่ได้/คลิกไม่ได้ */}
                     <input
                       ref={firstInputRef}
                       type="date"
                       className="input"
-                      value={txnDate}
-                      onChange={(e) => setTxnDate(e.target.value)}
+                      value={todayISO}
+                      readOnly
+                      onKeyDown={(e) => e.preventDefault()}
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{ cursor: "not-allowed", background: "var(--panel)" }}
+                      title="Fixed to today"
                     />
                   </div>
 
@@ -673,7 +680,7 @@ export default function Home() {
                     <select
                       className="input"
                       value={String(txnCategory || 0)}
-                      onChange={(e) => setTxnCategory(Number(e.target.value))}  // <-- number
+                      onChange={(e) => setTxnCategory(Number(e.target.value))}
                     >
                       {categories.length === 0 && <option disabled>No categories</option>}
                       {categories.map((c) => {
@@ -713,7 +720,14 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-green"
-                    disabled={txnSaving || !txnType || !txnCategory || !txnAmount || Number(txnAmount) <= 0}
+                    disabled={
+                      txnSaving ||
+                      !txnType ||
+                      !txnCategory ||
+                      !txnAmount ||
+                      Number(txnAmount) <= 0 ||
+                      !activeBudgetCatIds.has(String(txnCategory)) // ⛔️ ไม่มี budget ก็ห้ามกด
+                    }
                     onClick={addTransaction}
                   >
                     {txnSaving ? "Saving..." : "Add"}

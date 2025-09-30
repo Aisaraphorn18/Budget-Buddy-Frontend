@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "@/app/components/sidebar";
 import "./styles.css";
 
-/* ===== Theme utils (เหมือนหน้า Home) ===== */
+/* ===== Theme utils ===== */
 const THEME_KEY = "theme";
 const readTheme = () => {
   if (typeof window === "undefined") return "light";
@@ -22,20 +22,8 @@ const applyTheme = (mode) => {
 
 /* ===== Helpers ===== */
 const pad2 = (n) => String(n).padStart(2, "0");
-const toYM = (y, m1to12) => `${y}-${pad2(m1to12)}`;
-const ymShort = (ym) => new Date(ym + "-01").toLocaleString("en-US", { month: "short" });
-const last6Months = (endYM /* YYYY-MM */) => {
-  const [y, m] = endYM.split("-").map(Number);
-  const base = new Date(y, m - 1, 1);
-  const arr = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
-    arr.push(toYM(d.getFullYear(), d.getMonth() + 1));
-  }
-  return arr;
-};
-const last6MonthsOptions = () => last6Months(new Date().toISOString().slice(0, 7));
 
+// รองรับ payload หลายแบบ
 const pickItems = (payload) => {
   const d = payload?.data ?? payload;
   if (Array.isArray(d)) return d;
@@ -45,6 +33,13 @@ const pickItems = (payload) => {
   if (Array.isArray(d?.data?.items)) return d.data.items;
   if (Array.isArray(d?.data?.transactions)) return d.data.transactions;
   return [];
+};
+
+// สำหรับเรียงใหม่→เก่า
+const toTime = (v) => {
+  if (!v) return 0;
+  const d = new Date(v);
+  return isNaN(d) ? 0 : d.getTime();
 };
 
 export default function Transactions() {
@@ -63,74 +58,82 @@ export default function Transactions() {
     setDark(checked);
   };
 
-  // ----- Filters -----
-  const [monthISO, setMonthISO] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const monthOptions = useMemo(() => last6MonthsOptions(), []);
-
-  // ----- Data -----
+  // ----- Data (ALL months) -----
   const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState("");
 
+  const makeAuth = () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    return {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    };
+  };
+
+  // ดึงประวัติทั้งหมดครั้งเดียว (ไม่มีการกรองเดือน)
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       setError("");
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const auth = {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        };
-
-        // ส่งพารามิเตอร์ month เสมอ เพื่อขอข้อมูลของเดือนที่เลือก
-        const txReq  = axios.get("http://localhost:4000/protected/api/v1/transactions", { ...auth, params: { month: monthISO } });
-        const catReq = axios.get("http://localhost:4000/protected/api/v1/categories", auth);
-
+        const txReq  = axios.get("http://localhost:4000/protected/api/v1/transactions", makeAuth());
+        const catReq = axios.get("http://localhost:4000/protected/api/v1/categories", makeAuth());
         const [txRes, catRes] = await Promise.all([txReq, catReq]);
 
-        // build category map
+        // category map
         const catList = pickItems(catRes);
         const catMap = {};
         for (const c of catList) {
           const id   = c.category_id ?? c.id ?? c._id ?? c.cid;
-          const name = c.category_name ?? c.name ?? c.title ?? c.label ?? (id != null ? `Category ${id}` : "—");
+          const name =
+            c.category_name ??
+            c.name ??
+            c.title ??
+            c.label ??
+            (id != null ? `Category ${id}` : "—");
           if (id != null) catMap[String(id)] = name;
         }
 
-        // normalize transactions (รองรับหลาย payload shapes)
+        // normalize + sort ใหม่→เก่า
         const list = pickItems(txRes);
-        const normalized = list.map((t) => {
-          const isIncome = String(t.type).toLowerCase() === "income";
-          const categoryName =
-            t.category_name ??
-            t.categoryName ??
-            t.category?.name ??
-            (t.category_id != null ? catMap[String(t.category_id)] : undefined) ??
-            "—";
-          const note = t.note ? ` / ${t.note}` : "";
-          const amountNum = Number(t.amount || 0);
+        const normalized = list
+          .map((t) => {
+            const rawDate =
+              t.transaction_date ?? t.created_at ?? t.date ?? t.txn_date ?? null;
+            const isIncome = String(t.type).toLowerCase() === "income";
+            const categoryName =
+              t.category_name ??
+              t.categoryName ??
+              t.category?.name ??
+              (t.category_id != null ? catMap[String(t.category_id)] : undefined) ??
+              "—";
+            const note = t.note ? ` / ${t.note}` : "";
+            const amountNum = Number(t.amount || 0);
 
-          return {
-            category: `${categoryName}${note}`,
-            date: formatDate(t.transaction_date ?? t.created_at ?? t.date ?? t.txn_date),
-            type: isIncome ? "Income" : "Expenses",
-            amount: isIncome ? amountNum : -Math.abs(amountNum),
-          };
-        });
+            return {
+              category: `${categoryName}${note}`,
+              date: formatDate(rawDate),
+              dateRaw: rawDate,              // เก็บไว้เรียง
+              type: isIncome ? "Income" : "Expenses",
+              amount: isIncome ? amountNum : -Math.abs(amountNum),
+            };
+          })
+          .sort((a, b) => toTime(b.dateRaw) - toTime(a.dateRaw)); // ใหม่→เก่า
 
         setItems(normalized);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Unknown error");
+        setError(e?.message || "Unknown error");
+        setItems([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchAll();
-  }, [monthISO]);
+  }, []);
 
   return (
     <div className="app transactions-page">
@@ -144,23 +147,14 @@ export default function Transactions() {
 
           <h1 className="page-title">Recent Transactions</h1>
 
-          {/* month filter (ย้อนหลัง 6 เดือน) */}
+          {/* เอา select เดือนออกแล้ว เหลือเพียงปุ่มธีม */}
           <div style={{ marginLeft: "auto", display: "flex", gap: 12, alignItems: "center" }}>
-            <select
-              className="input"
-              value={monthISO}
-              onChange={(e) => setMonthISO(e.target.value)}
-              aria-label="Select month (last 6 months)"
-            >
-              {monthOptions.map((m) => (
-                <option key={m} value={m}>
-                  {ymShort(m)} {m.slice(0,4)}
-                </option>
-              ))}
-            </select>
-
             <label className="toggle">
-              <input type="checkbox" checked={dark} onChange={(e) => onToggleTheme(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={dark}
+                onChange={(e) => onToggleTheme(e.target.checked)}
+              />
               <span className="toggle-slider">{dark ? "🌙" : "☀️"}</span>
             </label>
           </div>
