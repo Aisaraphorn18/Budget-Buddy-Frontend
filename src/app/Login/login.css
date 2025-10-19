@@ -1,31 +1,28 @@
-
-/* ---------- Theme tokens ---------- */
-:root{
-  --bg: #f6e4e7;          /* พื้นหลังชมพูอ่อน */
-  --card: #ffffff;        /* สีการ์ด */
-  --text: #30343a;        /* สีตัวอักษร */
-  --muted: #6b7280;       /* สีเทา label/placeholder */
-  --border: #e9edf1;      /* สีเส้นกรอบจาง ๆ */
-  --focus: #f2b6c3;       /* สีเน้นตอนโฟกัส */
-  --pink: #ffb7c6;        /* ปุ่มชมพู */
-  --pink-600: #ff9db2;    /* hover */
+/* ---------- Theme tokens (SCOPED) ---------- */
+.Background {
+  --bg: #f6e4e7;
+  --card: #ffffff;
+  --text: #30343a;
+  --muted: #6b7280;
+  --border: #e9edf1;
+  --focus: #f2b6c3;
+  --pink: #ffb7c6;
+  --pink-600: #ff9db2;
   --radius: 16px;
   --radius-sm: 12px;
   --shadow-card: 0 18px 40px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
   --shadow-soft: 0 1px 0 rgba(0,0,0,.02), inset 0 1px 2px rgba(0,0,0,.03);
-}
 
-/* ---------- Layout ---------- */
-.Background {
   background-color: var(--bg);
   width: 100%;
   min-height: 100vh;
-  display: flex;              
-  justify-content: center;    
-  align-items: center;        
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 24px;
 }
 
+/* ---------- Layout ---------- */
 .container {
   background-color: var(--card);
   width: 92%;
@@ -33,8 +30,8 @@
   padding: 40px 32px 28px;
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
-  display: flex;   
-  flex-direction: column;      
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 16px;
   text-align: left;
@@ -45,10 +42,9 @@
   width: 72px;
   height: 72px;
   object-fit: contain;
-  border-radius: 16px;              /* ขอบโค้งนิดให้ดูนุ่ม */
+  border-radius: 16px;
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.15));
 }
-
 .title {
   font-size: 1.6rem;
   font-weight: 800;
@@ -58,11 +54,7 @@
 }
 
 /* ---------- Fields ---------- */
-.field{
-  width: 100%;
-  position: relative; 
-}
-
+.field { width: 100%; position: relative; }
 .label {
   display: block;
   font-size: .95rem;
@@ -70,10 +62,8 @@
   color: #44505d;
   margin: 2px 0 6px;
 }
-
-/* กล่อง input สไตล์คลีน (จากเดิมเทาทึบ -> ขาวขอบจาง) */
 .box-input {
-  position: relative; /* สำคัญ: ให้ลูก absolute อ้างอิงกรอบนี้ได้ */
+  position: relative;
   width: 100%;
   background: #fff;
   border: 1px solid var(--border);
@@ -85,11 +75,11 @@
   box-shadow: var(--shadow-soft);
   transition: border-color .2s ease, box-shadow .2s ease, transform .05s ease;
 }
-
-.box-input:focus-within{
-  border-color: var(--focus);
-  box-shadow: 0 0 0 3px rgba(242,182,195,.28);
-  transform: translateY(-1px);
+.input:focus,
+.box-input:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--border) !important;
 }
 
 .input {
@@ -100,12 +90,10 @@
   font-size: 1rem;
   color: var(--text);
 }
-.input::placeholder{
-  color: var(--muted);
-}
+.input::placeholder { color: var(--muted); }
 
-/* ---------- Button ---------- */
-.btn{
+/* ---------- Buttons ---------- */
+.btn {
   background-color: var(--pink);
   color: #1f2937;
   font-weight: 700;
@@ -113,55 +101,78 @@
   min-width: 140px;
   padding: 0 16px;
   border: none;
-  border-radius: 999px;            /* pill */
+  border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 10px 18px rgba(255, 155, 176, .35);
+  box-shadow: 0 10px 18px rgba(255,155,176,.35);
   transition: transform .08s ease, box-shadow .2s ease, background-color .2s ease;
   margin-top: 4px;
 }
-.btn:hover{ 
+.btn:hover {
   background: var(--pink-600);
-  box-shadow: 0 12px 22px rgba(255, 155, 176, .45);
+  box-shadow: 0 12px 22px rgba(255,155,176,.45);
   transform: translateY(-1px);
 }
-.btn:active{ transform: translateY(0); }
+.btn:active { transform: translateY(0); }
 
-/* ---------- Input Icons ---------- */
-.iconuser,
-.iconpassword {
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;    /* เว้นระยะก่อน input */
-  opacity: 0.7;         /* ทำให้ดูนุ่ม */
+/* ---------- Icons ---------- */
+.iconuser, .iconpassword {
+  width: 18px; height: 18px; margin-right: 8px; opacity: .7;
 }
-
 .iconeye {
-  width: 18px;
-  height: 18px;
-  margin-left: 8px;     /* เว้นระยะหลัง input */
-  cursor: pointer;      /* ให้รู้สึกกดได้ */
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  width: 18px; height: 18px; margin-left: 8px;
+  cursor: pointer; opacity: .6; transition: opacity .2s ease;
 }
-.iconeye:hover {
-  opacity: 1;
+.iconeye:hover { opacity: 1; }
+
+/* ---------- Eye Button Reset ---------- */
+.btn-eye {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/* ---------- Register Link ---------- */
 .Register {
-  display: block;       /* ให้กินเต็มแถว */
-  text-align: right;    /* ชิดขอบขวา */
-  margin-top: 4px;      /* เว้นจากกล่องเล็กน้อย */
-  font-size: 0.9rem;
+  display: block;
+  text-align: right;
+  margin-top: 4px;
+  font-size: .9rem;
   color: var(--muted);
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color .2s ease;
 }
-.Register:hover {
-  color: #e85d75;
+.Register:hover { color: #e85d75; }
+
+/* ---------- Autofill Fix ---------- */
+.Background input,
+.Background select,
+.Background textarea {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
 }
-
-
+.Background input:-webkit-autofill,
+.Background input:-webkit-autofill:hover,
+.Background input:-webkit-autofill:focus,
+.Background input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset !important;
+  box-shadow: 0 0 0 1000px var(--card) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  caret-color: var(--text);
+  transition: background-color 5000s ease-in-out 0s;
+}
+.Background input:-webkit-autofill::first-line {
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+}
 
 /* ---------- Mobile ---------- */
 @media (max-width: 480px) {
