@@ -73,6 +73,9 @@ export default function Home() {
   const [catsError, setCatsError] = useState("");
   const [txnError, setTxnError] = useState("");
 
+  // กันอาการกะพริบหลังโหลดครั้งแรก
+  const didLoadOnce = useRef(false);
+
   /* ===== Modals ===== */
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showTxnModal, setShowTxnModal] = useState(false);
@@ -90,14 +93,17 @@ export default function Home() {
   const [amount, setAmount] = useState("");
   const firstInputRef = useRef(null);
 
-  // ⬇️ “วันนี้” และล็อกไว้
+  // “วันนี้” และล็อกไว้
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [txnDate, setTxnDate] = useState(todayISO);
   const [txnType, setTxnType] = useState("");
-  const [txnCategory, setTxnCategory] = useState(0); // number
+  const [txnCategory, setTxnCategory] = useState(""); // ใช้ string เพื่อรองรับ placeholder
   const [txnAmount, setTxnAmount] = useState("");
   const [txnNote, setTxnNote] = useState("");
   const [txnSaving, setTxnSaving] = useState(false);
+
+  // ref สำหรับโฟกัสกลับไปที่ Category เมื่อ error
+  const catSelectRef = useRef(null);
 
   /* ===== Active budgets / filters ===== */
   const activeBudgetCatIds = useMemo(() => {
@@ -156,7 +162,7 @@ export default function Home() {
     [budgets, catName]
   );
 
-  /* ===== Load all ===== */
+  /* ===== Load all (เสถียร) ===== */
   const loadAll = useCallback(async () => {
     setLoading(true);
     setBudError("");
@@ -177,19 +183,28 @@ export default function Home() {
       setBudgets(buds);
       setTxns(txs);
 
-      // ตั้ง default ครั้งแรก
+      // ตั้ง default เฉพาะ Budget modal
       if (!selectedCategory && cats[0]) {
         const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
         setSelectedCategory(firstId);
       }
-      if (!txnCategory && cats[0]) {
-        const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
-        setTxnCategory(firstId);
-      }
 
-      // คำนวณสรุป
-      const inc = filteredIncomeTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const exp = filteredExpenseTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      // คำนวณสรุปจากผล fetch ตรงๆ เพื่อตัด dependency loop
+      const budSet = new Set(buds.map((b) => String(b.category_id ?? b.id ?? "")));
+
+      const inc = txs
+        .filter((t) => String(t.type ?? "").toLowerCase() === "income" && isInSelectedMonth(t))
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+      const exp = txs
+        .filter(
+          (t) =>
+            String(t.type ?? "").toLowerCase() === "expense" &&
+            isInSelectedMonth(t) &&
+            budSet.has(String(t.category_id ?? t.categoryId ?? ""))
+        )
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
       setIncome(inc);
       setExpenses(exp);
     } catch (err) {
@@ -200,8 +215,9 @@ export default function Home() {
       setTxnError(msg || "โหลด Transaction ไม่สำเร็จ");
     } finally {
       setLoading(false);
+      didLoadOnce.current = true;
     }
-  }, [monthISO, filteredIncomeTxns, filteredExpenseTxns, selectedCategory, txnCategory]);
+  }, [monthISO, isInSelectedMonth, selectedCategory]);
 
   useEffect(() => {
     loadAll();
@@ -211,6 +227,7 @@ export default function Home() {
   }, [loadAll]);
 
   /* ===== Actions ===== */
+
   const createBudget = async () => {
     try {
       await api.post("/protected/api/v1/budgets", {
@@ -231,31 +248,38 @@ export default function Home() {
     }
   };
 
+  // ✅ อนุญาต Income บันทึกได้แม้ไม่มี Budget (เช็ค Budget เฉพาะ Expense)
   const addTransaction = async () => {
     try {
       setTxnSaving(true);
       setTxnError("");
 
-      // ⛔️ บังคับว่าต้องมี Budget สำหรับ category ที่เลือก (ไม่ว่าจะ income/expense)
-      const hasBudget = activeBudgetCatIds.has(String(txnCategory));
-      if (!hasBudget) {
-        setTxnSaving(false);
-        return setTxnError("ไม่สามารถบันทึกธุรกรรมได้ เพราะหมวดนี้ยังไม่มี Budget");
+      const isExpense = String(txnType).toLowerCase() === "expense";
+      if (isExpense) {
+        const hasBudget = activeBudgetCatIds.has(String(txnCategory));
+        if (!hasBudget) {
+          setTxnSaving(false);
+          setTxnError("ไม่สามารถ Add Transaction ได้: หมวดรายจ่ายนี้ยังไม่มี Budget");
+          catSelectRef.current?.focus();
+          return;
+        }
       }
 
-      const today = todayISO; // วันนี้เสมอ
+      const today = todayISO;
 
       await api.post("/protected/api/v1/transactions", {
-        category_id: Number(txnCategory),
+        category_id: Number(txnCategory || 0),
         type: txnType,
         amount: Number(txnAmount),
         note: txnNote || "",
-        date: today, // fixed วันนี้
+        date: today,
       });
 
       setShowTxnModal(false);
       setTxnAmount("");
       setTxnNote("");
+      setTxnCategory("");   // รีเซ็ต placeholder
+      setTxnType("");
       await loadAll();
     } catch (err) {
       console.error(err);
@@ -381,13 +405,9 @@ export default function Home() {
             <button
               className="btn btn-green"
               onClick={() => {
-                // เปิดโมดัลเพิ่มธุรกรรม: ล็อกวันที่เป็นวันนี้
-                setTxnDate(todayISO);
+                setTxnDate(todayISO); // ล็อกวันนี้
                 setTxnType("");
-                if (!txnCategory && categories[0]) {
-                  const firstId = Number(categories[0].category_id ?? categories[0].id ?? 0);
-                  setTxnCategory(firstId);
-                }
+                setTxnCategory(""); // ให้เห็น placeholder
                 setTxnAmount("");
                 setTxnNote("");
                 setTxnError("");
@@ -415,9 +435,9 @@ export default function Home() {
 
         {/* ===== Budget grid ===== */}
         <section className="budget-grid">
-          {loading && budgetsView.length === 0 && <div className="muted">กำลังโหลดข้อมูล…</div>}
+          {!didLoadOnce.current && loading && <div className="muted">กำลังโหลดข้อมูล…</div>}
           {budError && <div className="error">{budError}</div>}
-          {!loading && !budError && budgetsView.length === 0 && (
+          {didLoadOnce.current && !loading && !budError && budgetsView.length === 0 && (
             <div className="muted">ยังไม่มี Budget</div>
           )}
 
@@ -479,7 +499,13 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+                <div
+                  className="progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct}
+                >
                   <div className="bar" style={barStyle} />
                 </div>
               </div>
@@ -489,7 +515,10 @@ export default function Home() {
 
         {/* ===== Create Budget Modal ===== */}
         {showBudgetModal && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}
+          >
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Create Budget</h3>
@@ -644,7 +673,10 @@ export default function Home() {
 
         {/* ===== Add Transaction Modal ===== */}
         {showTxnModal && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}
+          >
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Add Transaction</h3>
@@ -654,7 +686,7 @@ export default function Home() {
 
                 <div className="form-grid-2">
                   <div className="form-row">
-                    {/* 🔒 ล็อกเป็น "วันนี้" แก้ไม่ได้/คลิกไม่ได้ */}
+                    {/* 🔒 ล็อกเป็น "วันนี้" */}
                     <input
                       ref={firstInputRef}
                       type="date"
@@ -670,7 +702,7 @@ export default function Home() {
 
                   <div className="form-row">
                     <select className="input" value={txnType} onChange={(e) => setTxnType(e.target.value)}>
-                      <option value="" disabled>Type</option>
+                      <option value="" disabled hidden>Type</option>
                       <option value="income">Income</option>
                       <option value="expense">Expense</option>
                     </select>
@@ -679,12 +711,14 @@ export default function Home() {
                   <div className="form-row">
                     <select
                       className="input"
-                      value={String(txnCategory || 0)}
-                      onChange={(e) => setTxnCategory(Number(e.target.value))}
+                      value={txnCategory}
+                      onChange={(e) => setTxnCategory(e.target.value)}
+                      ref={catSelectRef}
                     >
+                      <option value="" disabled hidden>Category</option>
                       {categories.length === 0 && <option disabled>No categories</option>}
                       {categories.map((c) => {
-                        const id = Number(c.category_id ?? c.id ?? 0);
+                        const id = String(c.category_id ?? c.id ?? "");
                         const name = c.category_name ?? c.name ?? `Category ${id || ""}`;
                         return (
                           <option key={id} value={id}>{name}</option>
@@ -725,8 +759,7 @@ export default function Home() {
                       !txnType ||
                       !txnCategory ||
                       !txnAmount ||
-                      Number(txnAmount) <= 0 ||
-                      !activeBudgetCatIds.has(String(txnCategory)) // ⛔️ ไม่มี budget ก็ห้ามกด
+                      Number(txnAmount) <= 0
                     }
                     onClick={addTransaction}
                   >
