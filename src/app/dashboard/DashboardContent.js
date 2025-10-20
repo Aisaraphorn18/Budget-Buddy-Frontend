@@ -5,7 +5,7 @@ import Sidebar from "@/app/components/sidebar";
 import { useMemo, useState, useEffect, useLayoutEffect } from "react";
 import api from "@/app/lib/axiosClient";
 
-/** สีสำหรับโดนัท */
+/** ===== สีสำหรับโดนัท ===== */
 const COLOR_POOL = [
   "#6E47E8","#10B981","#F59E0B","#EF4444","#06B6D4","#A78BFA",
   "#F97316","#22C55E","#3B82F6","#E11D48","#14B8A6","#8B5CF6",
@@ -29,12 +29,6 @@ const applyTheme = (mode) => {
 };
 
 /* ---------- helpers ---------- */
-const asArray = (x) =>
-  (Array.isArray(x?.data) && x.data) ||
-  (Array.isArray(x?.items) && x.items) ||
-  (Array.isArray(x) && x) ||
-  [];
-
 const pad2 = (n) => String(n).padStart(2, "0");
 const ymShort = (ymStr) => new Date(ymStr + "-01").toLocaleString("en-US", { month: "short" });
 const toYM = (y, m1to12) => `${y}-${pad2(m1to12)}`;
@@ -55,7 +49,6 @@ const last6MonthsFrom = (monthISO) => {
   }
   return arr;
 };
-
 const last6MonthsOptions = () => {
   const nowYM = new Date().toISOString().slice(0, 7);
   return last6MonthsFrom(nowYM);
@@ -73,27 +66,24 @@ const formatDate = (iso) => {
   return `${parts[0]} ${parts[1].replace(".", "")}, ${parts[2]}`;
 };
 
-/* ===== ดึงเซ็ตหมวดที่มี Budget ===== */
-async function fetchBudgetCatIds() {
-  const budRes = await api.get("/protected/api/v1/budgets");
-  const budgets =
-    (Array.isArray(budRes?.data?.data) && budRes.data.data) ||
-    (Array.isArray(budRes?.data?.items) && budRes.data.items) ||
-    (Array.isArray(budRes?.data?.budgets) && budRes.data.budgets) ||
-    (Array.isArray(budRes?.data) && budRes.data) ||
-    [];
-  return new Set(
-    budgets
-      .map((b) => b.category_id ?? b.id ?? b.category?.id)
-      .filter((x) => x != null)
-      .map((x) => String(x))
-  );
+/* ===== ดึงชื่อหมวด ===== */
+async function fetchCategoryNameMap() {
+  const catRes = await api.get("/protected/api/v1/categories");
+  const cats =
+    (Array.isArray(catRes?.data?.data) && catRes.data.data) ||
+    (Array.isArray(catRes?.data?.items) && catRes.data.items) ||
+    (Array.isArray(catRes?.data) && catRes.data) || [];
+  const map = {};
+  for (const c of cats) {
+    const id = c.category_id ?? c.id ?? c._id;
+    const name = c.category_name ?? c.name ?? `Category ${id ?? ""}`;
+    if (id != null) map[String(id)] = name;
+  }
+  return map;
 }
 
-/* ===== รวมยอดโดนัท “เฉพาะหมวดที่มี Budget” ===== */
+/* ===== โดนัท: รวม "ทุกรายจ่าย" ตามธุรกรรมจริง แม้ไม่มี Budget ===== */
 async function buildDonutForDateRange(start_date, end_date) {
-  const budgetCatIds = await fetchBudgetCatIds();
-
   const LIMIT = 100;
   let page = 1;
   let allTx = [];
@@ -107,8 +97,7 @@ async function buildDonutForDateRange(start_date, end_date) {
     const list =
       (Array.isArray(payload?.data) && payload.data) ||
       (Array.isArray(payload?.items) && payload.items) ||
-      (Array.isArray(payload) && payload) ||
-      [];
+      (Array.isArray(payload) && payload) || [];
 
     allTx = allTx.concat(list);
 
@@ -120,26 +109,14 @@ async function buildDonutForDateRange(start_date, end_date) {
 
     if (totalPages && curPage >= totalPages) break;
     if (list.length < LIMIT) break;
-
     page += 1;
     if (page > 50) break;
   }
 
-  // แผนที่ id -> name
-  const catRes = await api.get("/protected/api/v1/categories");
-  const cats =
-    (Array.isArray(catRes?.data?.data) && catRes.data.data) ||
-    (Array.isArray(catRes?.data?.items) && catRes.data.items) ||
-    (Array.isArray(catRes?.data) && catRes.data) ||
-    [];
-  const catNameById = {};
-  for (const c of cats) {
-    const id = c.category_id ?? c.id ?? c._id;
-    const name = c.category_name ?? c.name ?? `Category ${id ?? ""}`;
-    if (id != null) catNameById[String(id)] = name;
-  }
+  // map id -> name
+  const catNameById = await fetchCategoryNameMap();
 
-  // รวมเฉพาะ expense ที่อยู่ในงบ
+  // รวมเฉพาะ expense (ทุกหมวด)
   const sumByCat = new Map();
   for (const t of allTx) {
     if (String(t.type ?? "").toLowerCase() !== "expense") continue;
@@ -147,7 +124,6 @@ async function buildDonutForDateRange(start_date, end_date) {
     const rawId = t.category_id ?? t.categoryId ?? t.category?.id;
     if (rawId == null) continue;
     const key = String(rawId);
-    if (!budgetCatIds.has(key)) continue;
 
     const amtRaw = t.amount;
     const amt =
@@ -168,10 +144,23 @@ async function buildDonutForDateRange(start_date, end_date) {
   }));
 }
 
-/* ===== รวมยอดรายรับ/รายจ่ายของ “เดือนเดียว” โดยให้รายจ่ายอิง Budget ===== */
+/* ===== สรุปกราฟแท่ง: รวมรายรับปกติ + รายจ่ายที่ "อิงเฉพาะหมวดที่มี Budget" เพื่อให้ตรงหน้าหลัก ===== */
 async function computeMonthIEWithBudget(monthISO) {
   const { start_date, end_date } = monthRange(monthISO);
-  const budgetCatIds = await fetchBudgetCatIds();
+
+  // ดึง set ของ category ที่มี budget (เดือนใดก็ได้) เพื่อความเข้ากันกับ Home
+  const budRes = await api.get("/protected/api/v1/budgets");
+  const budgets =
+    (Array.isArray(budRes?.data?.data) && budRes.data.data) ||
+    (Array.isArray(budRes?.data?.items) && budRes.data.items) ||
+    (Array.isArray(budRes?.data?.budgets) && budRes.data.budgets) ||
+    (Array.isArray(budRes?.data) && budRes.data) || [];
+  const budgetCatIds = new Set(
+    budgets
+      .map((b) => b.category_id ?? b.id ?? b.category?.id)
+      .filter((x) => x != null)
+      .map((x) => String(x))
+  );
 
   const LIMIT = 100;
   let page = 1;
@@ -187,8 +176,7 @@ async function computeMonthIEWithBudget(monthISO) {
     const list =
       (Array.isArray(payload?.data) && payload.data) ||
       (Array.isArray(payload?.items) && payload.items) ||
-      (Array.isArray(payload) && payload) ||
-      [];
+      (Array.isArray(payload) && payload) || [];
 
     for (const t of list) {
       const type = String(t.type ?? "").toLowerCase();
@@ -203,7 +191,7 @@ async function computeMonthIEWithBudget(monthISO) {
         const rawId = t.category_id ?? t.categoryId ?? t.category?.id;
         const key = rawId != null ? String(rawId) : null;
         if (key && budgetCatIds.has(key)) {
-          expense += amt; // อิงงบเท่านั้น
+          expense += amt; // นับเฉพาะที่มีงบ
         }
       }
     }
@@ -216,7 +204,6 @@ async function computeMonthIEWithBudget(monthISO) {
 
     if (totalPages && curPage >= totalPages) break;
     if (list.length < LIMIT) break;
-
     page += 1;
     if (page > 50) break;
   }
@@ -225,7 +212,7 @@ async function computeMonthIEWithBudget(monthISO) {
 }
 
 export default function DashboardContent() {
-  /* ==== Theme state & init ==== */
+  /* ==== Theme ==== */
   const [dark, setDark] = useState(false);
   useLayoutEffect(() => {
     const mode = readTheme();
@@ -238,29 +225,28 @@ export default function DashboardContent() {
     setDark(checked);
   };
 
+  /* ==== Filters & state ==== */
+  const [view, setView] = useState("summary");
   const [filterValue, setFilterValue] = useState("LAST_6M");
   const currentYM = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const monthISO = filterValue === "LAST_6M" ? currentYM : filterValue;
-
-  const [view, setView] = useState("summary");
-  const [monthly, setMonthly] = useState([]);
-  const [categoryData, setCategoryData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const [isOpen, setIsOpen] = useState(false);
-  const toggleSidebar = () => setIsOpen((v) => !v);
-
-  const [openCatId, setOpenCatId] = useState(null);
-  const [detailsByCat, setDetailsByCat] = useState({});
-
   const monthsForBars = useMemo(
     () => (filterValue === "LAST_6M" ? last6MonthsFrom(currentYM) : [monthISO]),
     [filterValue, currentYM, monthISO]
   );
-
   const monthOptions = useMemo(() => last6MonthsOptions(), []);
 
+  const [isOpen, setIsOpen] = useState(false);
+  const toggleSidebar = () => setIsOpen((v) => !v);
+
+  const [monthly, setMonthly] = useState([]);          // กรองแล้ว (เฉพาะเดือนที่มีข้อมูล)
+  const [categoryData, setCategoryData] = useState([]); // โดนัท
+  const [openCatId, setOpenCatId] = useState(null);
+  const [detailsByCat, setDetailsByCat] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  /* ==== Load data ==== */
   useEffect(() => {
     let cancelled = false;
 
@@ -269,22 +255,27 @@ export default function DashboardContent() {
       setError("");
 
       try {
-        // ===== SUMMARY (bar) — คำนวณจาก transactions ให้ตรงกับ Home =====
+        // 1) SUMMARY (bars) — คำนวณต่อเดือน แล้ว "กรอง" เฉพาะเดือนที่มีข้อมูลจริง
         const bars = [];
         for (const m of monthsForBars) {
           const { income, expense } = await computeMonthIEWithBudget(m);
           bars.push({ month: m, m: ymShort(m), income, expense });
         }
-        if (!cancelled) setMonthly(bars);
+        const filteredBars = bars.filter(b => (b.income ?? 0) > 0 || (b.expense ?? 0) > 0);
+        if (!cancelled) setMonthly(filteredBars);
 
-        // ===== DONUT (อิงเฉพาะหมวดที่มี Budget) =====
+        // 2) DONUT — ใช้ช่วงจริงที่มีข้อมูล
         let donut = [];
         if (filterValue === "LAST_6M") {
-          const start = monthsForBars[0];
-          const end = monthsForBars[monthsForBars.length - 1];
-          const { start_date } = monthRange(start);
-          const { end_date } = monthRange(end);
-          donut = await buildDonutForDateRange(start_date, end_date);
+          if (filteredBars.length > 0) {
+            const startYM = filteredBars[0].month;
+            const endYM   = filteredBars[filteredBars.length - 1].month;
+            const { start_date } = monthRange(startYM);
+            const { end_date }   = monthRange(endYM);
+            donut = await buildDonutForDateRange(start_date, end_date);
+          } else {
+            donut = []; // ไม่มีข้อมูลเลย ไม่ต้องแสดงโดนัท
+          }
         } else {
           const { start_date, end_date } = monthRange(monthISO);
           donut = await buildDonutForDateRange(start_date, end_date);
@@ -305,15 +296,20 @@ export default function DashboardContent() {
     return () => { cancelled = true; };
   }, [filterValue, monthISO, monthsForBars]);
 
+  /* ==== Details loader per category ==== */
   const loadCategoryDetails = async (catId) => {
     setDetailsByCat((s) => ({ ...s, [catId]: { loading: true, items: s[catId]?.items || [] } }));
     try {
       let start_date, end_date;
       if (filterValue === "LAST_6M") {
-        const start = monthsForBars[0];
-        const end = monthsForBars[monthsForBars.length - 1];
+        if (monthly.length === 0) {
+          setDetailsByCat((s) => ({ ...s, [catId]: { loading: false, items: [] } }));
+          return;
+        }
+        const start = monthly[0].month;
+        const end   = monthly[monthly.length - 1].month;
         start_date = monthRange(start).start_date;
-        end_date = monthRange(end).end_date;
+        end_date   = monthRange(end).end_date;
       } else {
         ({ start_date, end_date } = monthRange(monthISO));
       }
@@ -327,10 +323,8 @@ export default function DashboardContent() {
           params: {
             type: "expense",
             category_id: String(catId),
-            start_date,
-            end_date,
-            limit: String(LIMIT),
-            page: String(page),
+            start_date, end_date,
+            limit: String(LIMIT), page: String(page),
           },
         });
 
@@ -338,8 +332,7 @@ export default function DashboardContent() {
         const list =
           (Array.isArray(payload?.data) && payload.data) ||
           (Array.isArray(payload?.items) && payload.items) ||
-          (Array.isArray(payload) && payload) ||
-          [];
+          (Array.isArray(payload) && payload) || [];
 
         const mapped = list.map((t) => ({
           id: t.transaction_id ?? t.id,
@@ -361,7 +354,6 @@ export default function DashboardContent() {
 
         if (totalPages && curPage >= totalPages) break;
         if (list.length < LIMIT) break;
-
         page += 1;
         if (page > 50) break;
       }
@@ -375,6 +367,12 @@ export default function DashboardContent() {
       }));
     }
   };
+
+  /* ==== Derived ==== */
+  const hasMonthlyData = monthly.length > 0;
+  const maxY = useMemo(() => Math.max(...monthly.flatMap((x) => [x.income, x.expense]), 0), [monthly]);
+  const totalIncome = useMemo(() => monthly.reduce((s, x) => s + x.income, 0), [monthly]);
+  const totalExpense = useMemo(() => monthly.reduce((s, x) => s + x.expense, 0), [monthly]);
 
   const totalCat = useMemo(() => categoryData.reduce((sum, d) => sum + d.amount, 0), [categoryData]);
   const parts = useMemo(() => {
@@ -391,32 +389,25 @@ export default function DashboardContent() {
     ? `conic-gradient(${parts.map((p) => `${p.color} ${p.from}% ${p.to}%`).join(", ")})`
     : `conic-gradient(#e5e7eb 0 100%)`;
 
-  const maxY = useMemo(() => Math.max(...monthly.flatMap((x) => [x.income, x.expense]), 0), [monthly]);
-  const totalIncome = useMemo(() => monthly.reduce((s, x) => s + x.income, 0), [monthly]);
-  const totalExpense = useMemo(() => monthly.reduce((s, x) => s + x.expense, 0), [monthly]);
-
-  const totalExpenseForCard = useMemo(
-    () => (filterValue === "LAST_6M" ? totalExpense : totalCat),
-    [filterValue, totalExpense, totalCat]
-  );
-
   const asOf = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "2-digit" });
   const yearOfMonth = Number(monthISO.slice(0, 4));
   const monthShort = ymShort(monthISO);
+  const lastLabel = filterValue === "LAST_6M"
+    ? (hasMonthlyData ? `${ymShort(monthly[monthly.length - 1].month)} ${monthly[monthly.length - 1].month.slice(0,4)}` : "")
+    : `${monthShort} ${yearOfMonth}`;
   const barTitle =
     filterValue === "LAST_6M"
-      ? `Income & Expenses — Last 6 months (to ${ymShort(currentYM)} ${currentYM.slice(0, 4)})`
-      : `Income & Expenses — ${monthShort} ${yearOfMonth}`;
+      ? `Income & Expenses — Last 6 months${hasMonthlyData ? ` (to ${lastLabel})` : ""}`
+      : `Income & Expenses — ${lastLabel}`;
 
   return (
     <div className="app report-page">
       <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
-
       <main className="main">
         <div className="dashboard-content">
           <header className="fc-topbar">
             <div className="fc-title">
-              <button onClick={toggleSidebar}>
+              <button onClick={() => setIsOpen(true)}>
                 <img src="/hamburger.png" alt="icon-ham" className="iconham" />
               </button>
               <h1>Finance Chart</h1>
@@ -424,43 +415,23 @@ export default function DashboardContent() {
             </div>
 
             <label className="toggle" aria-label="Toggle theme">
-              <input
-                type="checkbox"
-                checked={dark}
-                onChange={(e) => onToggleTheme(e.target.checked)}
-              />
+              <input type="checkbox" checked={dark} onChange={(e) => onToggleTheme(e.target.checked)} />
               <span className="toggle-slider">{dark ? "🌙" : "☀️"}</span>
             </label>
           </header>
 
           <div className="row-head">
             <div className="fc-segment">
-              <button
-                className={`seg ${view === "summary" ? "active" : ""}`}
-                onClick={() => setView("summary")}
-              >
-                ภาพรวม
-              </button>
-              <button
-                className={`seg ${view === "category" ? "active" : ""}`}
-                onClick={() => setView("category")}
-              >
-                ตามหมวดหมู่
-              </button>
+              <button className={`seg ${view === "summary" ? "active" : ""}`} onClick={() => setView("summary")}>ภาพรวม</button>
+              <button className={`seg ${view === "category" ? "active" : ""}`} onClick={() => setView("category")}>ตามหมวดหมู่</button>
             </div>
 
             <div className="fc-filters">
               <div className="fc-filter">
-                <select
-                  value={filterValue}
-                  onChange={(e) => setFilterValue(e.target.value)}
-                  aria-label="Select month or last 6 months"
-                >
+                <select value={filterValue} onChange={(e) => setFilterValue(e.target.value)} aria-label="Select month or last 6 months">
                   <option value="LAST_6M">Last 6 months</option>
                   {last6MonthsOptions().map((m) => (
-                    <option key={m} value={m}>
-                      {ymShort(m)} {m.slice(0, 4)}
-                    </option>
+                    <option key={m} value={m}>{ymShort(m)} {m.slice(0, 4)}</option>
                   ))}
                 </select>
               </div>
@@ -470,7 +441,7 @@ export default function DashboardContent() {
           {loading && <p>Loading data...</p>}
           {error && <p className="error">{error}</p>}
 
-          {/* SUMMARY */}
+          {/* === SUMMARY === */}
           {view === "summary" && !loading && !error && (
             <>
               <section className="fc-board">
@@ -478,58 +449,58 @@ export default function DashboardContent() {
                   <h3>{barTitle}</h3>
                 </div>
 
-                <div
-                  className="bars-wrap"
-                  style={{ gridTemplateColumns: `repeat(${monthly.length || 1}, minmax(0, 1fr))` }}
-                >
-                  {monthly.length === 0 ? (
-                    <div style={{ gridColumn: "1 / -1", textAlign: "center", alignSelf: "center" }}>
-                      No data to display
-                    </div>
-                  ) : (
-                    monthly.map((x) => {
-                      const ih = maxY > 0 ? Math.round((x.income / maxY) * 100) : 0;
-                      const eh = maxY > 0 ? Math.round((x.expense / maxY) * 100) : 0;
-                      return (
-                        <div className="bar-col" key={x.month} title={x.month}>
-                          <div className="bar-stack">
-                            <span className="bar income" style={{ height: `${Math.max(ih, 4)}%` }} />
-                            <span className="bar expense" style={{ height: `${Math.max(eh, 4)}%` }} />
+                {!hasMonthlyData ? (
+                  <div className="empty-state">No data to display</div>
+                ) : (
+                  <>
+                    <div
+                      className="bars-wrap"
+                      style={{ gridTemplateColumns: `repeat(${monthly.length || 1}, minmax(0, 1fr))` }}
+                    >
+                      {monthly.map((x) => {
+                        const ih = maxY > 0 ? Math.round((x.income / maxY) * 100) : 0;
+                        const eh = maxY > 0 ? Math.round((x.expense / maxY) * 100) : 0;
+                        return (
+                          <div className="bar-col" key={x.month} title={x.month}>
+                            <div className="bar-stack">
+                              <span className="bar income"  style={{ height: `${ih}%` }} />
+                              <span className="bar expense" style={{ height: `${eh}%` }} />
+                            </div>
+                            <div className="bar-label">{x.m}</div>
                           </div>
-                          <div className="bar-label">{x.m}</div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="totals-row">
+                      <div className="mini-total">
+                        <span className="mini-ic">🐷</span>
+                        <div className="mini-meta">
+                          <div className="mini-title">Total Income (Baht)</div>
+                          <div className="mini-value">฿{totalIncome.toLocaleString()}</div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div className="totals-row">
-                  <div className="mini-total">
-                    <span className="mini-ic">🐷</span>
-                    <div className="mini-meta">
-                      <div className="mini-title">Total Income (Baht)</div>
-                      <div className="mini-value">฿{totalIncome.toLocaleString()}</div>
+                      </div>
+                      <div className="mini-total">
+                        <span className="mini-ic">🐷</span>
+                        <div className="mini-meta">
+                          <div className="mini-title">Total Expenses (Baht)</div>
+                          <div className="mini-value">฿{totalExpense.toLocaleString()}</div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mini-total">
-                    <span className="mini-ic">🐷</span>
-                    <div className="mini-meta">
-                      <div className="mini-title">Total Expenses (Baht)</div>
-                      <div className="mini-value">฿{totalExpense.toLocaleString()}</div>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="fc-sub">
-                  {filterValue === "LAST_6M" ? "Income & Expense (last 6 months)" : "Income & Expense (selected month)"}
-                </div>
-                <div className="fc-date">Data as of {asOf}</div>
+                    <div className="fc-sub">
+                      {filterValue === "LAST_6M" ? "Income & Expense (last 6 months)" : "Income & Expense (selected month)"}
+                    </div>
+                    <div className="fc-date">Data as of {asOf}</div>
+                  </>
+                )}
               </section>
 
-              {monthly.length > 0 && (
+              {hasMonthlyData && (
                 <section className="month-list">
                   <h4 className="year-title">
-                    {monthsForBars[0].slice(0, 4)} – {monthsForBars[monthsForBars.length - 1].slice(0, 4)}
+                    {monthly[0].month.slice(0, 4)} – {monthly[monthly.length - 1].month.slice(0, 4)}
                   </h4>
                   {monthly.map((row) => {
                     const net = row.income - row.expense;
@@ -558,50 +529,53 @@ export default function DashboardContent() {
             </>
           )}
 
-          {/* CATEGORY */}
+          {/* === CATEGORY === */}
           {view === "category" && !loading && !error && (
             <>
               <section className="fc-board">
                 <div className="fc-chart">
                   <h3>
-                    All Expenses — {filterValue === "LAST_6M" ? "Last 6 months" : `${ymShort(monthISO)} ${monthISO.slice(0,4)}`}
+                    All Expenses — {filterValue === "LAST_6M"
+                      ? (hasMonthlyData ? `Last 6 months (to ${lastLabel})` : "Last 6 months")
+                      : `${ymShort(monthISO)} ${monthISO.slice(0,4)}`}
                   </h3>
-                  <div className="donut-wrap">
-                    <div className="donut" style={{ background: donutGradient }}>
-                      <div className="donut-hole">
-                        <div className="donut-label">{parts.length ? "100%" : "0%"}</div>
+
+                  {!parts.length ? (
+                    <div className="empty-state">No data to display</div>
+                  ) : (
+                    <div className="donut-wrap">
+                      <div className="donut" style={{ background: donutGradient }}>
+                        <div className="donut-hole">
+                          <div className="donut-label">{parts.length ? "100%" : "0%"}</div>
+                        </div>
                       </div>
-                    </div>
-                    <ul className="legend">
-                      {parts.length === 0 ? (
-                        <li>No expenses in range</li>
-                      ) : (
-                        parts.map((p) => (
+                      <ul className="legend">
+                        {parts.map((p) => (
                           <li key={p.key}>
                             <span className="dot" style={{ background: p.color }} />
                             {p.key} — {p.pct.toFixed(1)}%
                           </li>
-                        ))
-                      )}
-                    </ul>
-                  </div>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 <div className="fc-total">
                   <div className="pig">🐷</div>
                   <div className="meta">
                     <div className="label">Total Expenses (Baht)</div>
-                    <div className="value">฿{totalExpenseForCard.toLocaleString("en-US")}</div>
+                    <div className="value">฿{totalCat.toLocaleString("en-US")}</div>
                   </div>
                 </div>
 
                 <div className="fc-date">Data as of {asOf}</div>
               </section>
 
+              {/* รายการธุรกรรมตามหมวด (แสดงเมื่อกดแถวใน legend/list ด้านล่าง) */}
               {parts.map((p) => {
                 const isOpenRow = openCatId === p.category_id;
                 const detail = detailsByCat[p.category_id];
-
                 return (
                   <section className="fc-list" key={p.key}>
                     <button
