@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import Sidebar from "@/app/components/sidebar";
 import api from "@/app/lib/axiosClient";
@@ -34,8 +35,16 @@ const pickItems = (res) => {
   if (Array.isArray(d?.data?.budgets)) return d.data.budgets;
   return [];
 };
+// YYYY-MM ของเดือนปัจจุบัน
+const currentMonthISO = () => {
+  const dd = new Date();
+  const m = String(dd.getMonth() + 1).padStart(2, "0");
+  return `${dd.getFullYear()}-${m}`;
+};
 
 export default function Home() {
+  const router = useRouter();
+
   /* ===== UI ===== */
   const [isOpen, setIsOpen] = useState(false);
   const toggleSidebar = () => setIsOpen((v) => !v);
@@ -52,7 +61,7 @@ export default function Home() {
     setDark(checked);
   };
 
-  /* ===== Month (สำหรับสรุป/กรอง) ===== */
+  /* ===== Month (สำหรับสรุป/กรองธุรกรรมหน้าบ้านเท่านั้น) ===== */
   const [monthISO] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
   const isInSelectedMonth = useCallback(
     (t) => String(t.date ?? t.transaction_date ?? t.created_at ?? "").slice(0, 7) === monthISO,
@@ -64,7 +73,7 @@ export default function Home() {
   const [expenses, setExpenses] = useState(0);
   const balance = useMemo(() => income - expenses, [income, expenses]);
 
-  const [budgets, setBudgets] = useState([]);
+  const [budgets, setBudgets] = useState([]); // budgets ของ “เดือนปัจจุบัน” เท่านั้น
   const [categories, setCategories] = useState([]);
   const [txns, setTxns] = useState([]);
 
@@ -73,7 +82,6 @@ export default function Home() {
   const [catsError, setCatsError] = useState("");
   const [txnError, setTxnError] = useState("");
 
-  // กันอาการกะพริบหลังโหลดครั้งแรก
   const didLoadOnce = useRef(false);
 
   /* ===== Modals ===== */
@@ -81,7 +89,7 @@ export default function Home() {
   const [showTxnModal, setShowTxnModal] = useState(false);
 
   // Edit modal
-  const [edit, setEdit] = useState(null); // {id, category_id, budget_amount, cycle_month}
+  const [edit, setEdit] = useState(null); // {id, category_id, budget_amount}
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Delete confirm
@@ -89,26 +97,27 @@ export default function Home() {
   const [deletingId, setDeletingId] = useState("");
 
   /* ===== Forms ===== */
-  const [selectedCategory, setSelectedCategory] = useState(0); // number
+  const [selectedCategory, setSelectedCategory] = useState(0);
   const [amount, setAmount] = useState("");
   const firstInputRef = useRef(null);
 
-  // “วันนี้” และล็อกไว้
+  const [createBudError, setCreateBudError] = useState(""); // ข้อความเตือนใน Create Budget
+  const [createBudSaving, setCreateBudSaving] = useState(false);
+
+  // วันนี้ (ล็อกใน add transaction)
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const [txnDate, setTxnDate] = useState(todayISO);
   const [txnType, setTxnType] = useState("");
-  const [txnCategory, setTxnCategory] = useState(""); // ใช้ string เพื่อรองรับ placeholder
+  const [txnCategory, setTxnCategory] = useState(""); // string เพื่อรองรับ placeholder
   const [txnAmount, setTxnAmount] = useState("");
   const [txnNote, setTxnNote] = useState("");
   const [txnSaving, setTxnSaving] = useState(false);
-
-  // ref สำหรับโฟกัสกลับไปที่ Category เมื่อ error
   const catSelectRef = useRef(null);
 
-  /* ===== Active budgets / filters ===== */
+  /* ===== Filters ===== */
+  // ✅ ใช้ category_id เท่านั้น (เลิกใช้ b.id เป็น fallback)
   const activeBudgetCatIds = useMemo(() => {
     const s = new Set();
-    for (const b of budgets) s.add(String(b.category_id ?? b.id ?? ""));
+    for (const b of budgets) s.add(String(b.category_id ?? ""));
     return s;
   }, [budgets]);
 
@@ -122,11 +131,6 @@ export default function Home() {
         return type === "expense" && activeBudgetCatIds.has(catId);
       }),
     [monthTxns, activeBudgetCatIds]
-  );
-
-  const filteredIncomeTxns = useMemo(
-    () => monthTxns.filter((t) => String(t.type ?? "").toLowerCase() === "income"),
-    [monthTxns]
   );
 
   /* ===== Derived ===== */
@@ -162,7 +166,7 @@ export default function Home() {
     [budgets, catName]
   );
 
-  /* ===== Load all (เสถียร) ===== */
+  /* ===== Load all ===== */
   const loadAll = useCallback(async () => {
     setLoading(true);
     setBudError("");
@@ -171,7 +175,8 @@ export default function Home() {
     try {
       const [catsRes, budRes, txnRes] = await Promise.all([
         api.get("/protected/api/v1/categories"),
-        api.get("/protected/api/v1/budgets"),
+        // ⭐ โหลด budgets เฉพาะเดือนปัจจุบัน
+        api.get("/protected/api/v1/budgets", { params: { cycle_month: monthISO } }),
         api.get("/protected/api/v1/transactions", { params: { month: monthISO } }),
       ]);
 
@@ -183,14 +188,13 @@ export default function Home() {
       setBudgets(buds);
       setTxns(txs);
 
-      // ตั้ง default เฉพาะ Budget modal
       if (!selectedCategory && cats[0]) {
         const firstId = Number(cats[0].category_id ?? cats[0].id ?? 0);
         setSelectedCategory(firstId);
       }
 
-      // คำนวณสรุปจากผล fetch ตรงๆ เพื่อตัด dependency loop
-      const budSet = new Set(buds.map((b) => String(b.category_id ?? b.id ?? "")));
+      // ✅ ใช้ category_id เท่านั้น (เลิกใช้ b.id เป็น fallback)
+      const budSet = new Set(buds.map((b) => String(b.category_id ?? "")));
 
       const inc = txs
         .filter((t) => String(t.type ?? "").toLowerCase() === "income" && isInSelectedMonth(t))
@@ -219,66 +223,91 @@ export default function Home() {
     }
   }, [monthISO, isInSelectedMonth, selectedCategory]);
 
+  /* ===== Auto refresh on return ===== */
   useEffect(() => {
     loadAll();
     const onFocus = () => loadAll();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [loadAll]);
+    const onPageShow = (e) => {
+      if (e.persisted) router.refresh();
+      loadAll();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") loadAll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [loadAll, router]);
 
   /* ===== Actions ===== */
 
+  // ✅ กันซ้ำเฉพาะเดือนนี้ด้วย category_id เท่านั้น
+  const isDupCategoryThisMonth = useMemo(
+    () => budgets.some((b) => String(b.category_id ?? "") === String(selectedCategory)),
+    [budgets, selectedCategory]
+  );
+
   const createBudget = async () => {
     try {
+      setCreateBudError("");
+      setCreateBudSaving(true);
+
+      if (isDupCategoryThisMonth) {
+        setCreateBudError("ไม่สามารถสร้าง Budget ได้หมวดหมู่นี้ถูกสร้างไว้แล้วในเดือนนี้");
+        return;
+      }
+
       await api.post("/protected/api/v1/budgets", {
         category_id: Number(selectedCategory),
         budget_amount: Number(amount),
         cycle_month: monthISO,
       });
+
       setShowBudgetModal(false);
       setAmount("");
       await loadAll();
     } catch (err) {
-      console.error(err);
-      alert(
-        axios.isAxiosError(err)
-          ? err.response?.data?.message || "สร้าง Budget ไม่สำเร็จ"
-          : "เกิดข้อผิดพลาด"
-      );
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        if (status === 409) {
+          setCreateBudError("ไม่สามารถสร้าง Budget ได้: หมวดหมู่นี้ถูกสร้างไว้แล้วในเดือนนี้");
+        } else {
+          const data = err.response?.data;
+          const apiMsg = typeof data === "string" ? data : data?.message;
+          setCreateBudError(apiMsg || "สร้าง Budget ไม่สำเร็จ");
+        }
+      } else {
+        setCreateBudError("เกิดข้อผิดพลาด");
+      }
+    } finally {
+      setCreateBudSaving(false);
     }
   };
 
-  // ✅ อนุญาต Income บันทึกได้แม้ไม่มี Budget (เช็ค Budget เฉพาะ Expense)
+  // Add Transaction: อนุญาตเสมอแม้ไม่มี Budget
   const addTransaction = async () => {
     try {
       setTxnSaving(true);
       setTxnError("");
-
-      const isExpense = String(txnType).toLowerCase() === "expense";
-      if (isExpense) {
-        const hasBudget = activeBudgetCatIds.has(String(txnCategory));
-        if (!hasBudget) {
-          setTxnSaving(false);
-          setTxnError("ไม่สามารถ Add Transaction ได้: หมวดรายจ่ายนี้ยังไม่มี Budget");
-          catSelectRef.current?.focus();
-          return;
-        }
-      }
-
-      const today = todayISO;
 
       await api.post("/protected/api/v1/transactions", {
         category_id: Number(txnCategory || 0),
         type: txnType,
         amount: Number(txnAmount),
         note: txnNote || "",
-        date: today,
+        date: todayISO,
       });
 
       setShowTxnModal(false);
       setTxnAmount("");
       setTxnNote("");
-      setTxnCategory("");   // รีเซ็ต placeholder
+      setTxnCategory("");
       setTxnType("");
       await loadAll();
     } catch (err) {
@@ -293,66 +322,65 @@ export default function Home() {
     }
   };
 
+  // บังคับเลข id ให้ชัด
   const openConfirm = (b) => {
-    const id = b.budget_id ?? b.id;
+    const id = Number(b.budget_id ?? b.id);
     const name = b.category_name ?? catName(b.category_id) ?? `Budget ${id}`;
     setConfirm({ id, name });
   };
 
+  // ลบแบบตรวจสถานะเอง
   const doDelete = async () => {
     try {
       setDeletingId(String(confirm.id));
-      await api.delete(`/protected/api/v1/budgets/${confirm.id}`);
+
+      const res = await api.request({
+        url: `/protected/api/v1/budgets/${confirm.id}`,
+        method: "DELETE",
+        headers: {
+          ...(api.defaults.headers?.common?.Authorization
+            ? { Authorization: api.defaults.headers.common.Authorization }
+            : {}),
+          "Content-Type": "application/json",
+        },
+        validateStatus: () => true,
+      });
+
+      const ok = res.status === 200 || res.status === 204 || res.data?.success === true;
+      if (!ok) throw new Error(res.data?.message || `Delete failed (status ${res.status})`);
+
       setConfirm(null);
       await loadAll();
     } catch (err) {
       console.error("Delete budget error:", err);
-      alert(
-        axios.isAxiosError(err)
-          ? err.response?.data?.message || "ลบ Budget ไม่สำเร็จ"
-          : "เกิดข้อผิดพลาด"
-      );
+      alert(err?.message || "ลบ Budget ไม่สำเร็จ");
     } finally {
       setDeletingId("");
     }
   };
 
-  const openEdit = (b) => {
-    const id = b.budget_id ?? b.id;
-    setEdit({
-      id,
-      category_id: String(b.category_id ?? ""),
-      budget_amount: String(b.budget_amount ?? ""),
-      cycle_month: b.cycle_month ?? monthISO,
-    });
-  };
+  // ช่วยเลือกหมวดที่ "ยังไม่มี budget เดือนนี้" อัตโนมัติ
+  const openCreateBudgetModal = () => {
+    setAmount("");
+    setCreateBudError("");
 
-  const updateBudget = async () => {
-    if (!edit) return;
-    try {
-      setSavingEdit(true);
-      await api.put(`/protected/api/v1/budgets/${edit.id}`, {
-        category_id: Number(edit.category_id),
-        budget_amount: Number(edit.budget_amount),
-        cycle_month: edit.cycle_month,
-      });
-      setEdit(null);
-      await loadAll();
-    } catch (err) {
-      console.error("Update budget error:", err);
-      alert(
-        axios.isAxiosError(err)
-          ? err.response?.data?.message || "อัปเดต Budget ไม่สำเร็จ"
-          : "เกิดข้อผิดพลาด"
-      );
-    } finally {
-      setSavingEdit(false);
+    const taken = new Set(budgets.map((b) => String(b.category_id ?? "")));
+    const firstFree = categories.find(
+      (c) => !taken.has(String(c.category_id ?? c.id ?? ""))
+    );
+
+    if (firstFree) {
+      setSelectedCategory(Number(firstFree.category_id ?? firstFree.id));
+    } else if (categories[0]) {
+      setSelectedCategory(Number(categories[0].category_id ?? categories[0].id));
     }
+
+    setShowBudgetModal(true);
   };
 
   /* ===== UI ===== */
   return (
-    <div className="app">
+    <div className="app wallet-vars">
       <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
       <main className="main">
@@ -405,9 +433,8 @@ export default function Home() {
             <button
               className="btn btn-green"
               onClick={() => {
-                setTxnDate(todayISO); // ล็อกวันนี้
                 setTxnType("");
-                setTxnCategory(""); // ให้เห็น placeholder
+                setTxnCategory("");
                 setTxnAmount("");
                 setTxnNote("");
                 setTxnError("");
@@ -417,17 +444,7 @@ export default function Home() {
               + add transaction
             </button>
 
-            <button
-              className="btn btn-red"
-              onClick={() => {
-                setAmount("");
-                if (!selectedCategory && categories[0]) {
-                  const firstId = Number(categories[0].category_id ?? categories[0].id ?? 0);
-                  setSelectedCategory(firstId);
-                }
-                setShowBudgetModal(true);
-              }}
-            >
+            <button className="btn btn-red" onClick={openCreateBudgetModal}>
               + create budget
             </button>
           </div>
@@ -477,14 +494,14 @@ export default function Home() {
                     <div className="meta">Last Paid on {paid}</div>
                   </div>
                   <div className="right">
-                    <button className="icon-btn" title="Edit" onClick={() => openEdit(b)}>
+                    <button className="icon-btn" title="Edit" onClick={() => setEdit({
+                      id: b.budget_id ?? b.id,
+                      category_id: String(b.category_id ?? ""),
+                      budget_amount: String(b.budget_amount ?? ""),
+                    })}>
                       <img className="icon" src="/edit.png" alt="edit" />
                     </button>
-                    <button
-                      className="icon-btn"
-                      title="Delete"
-                      onClick={() => openConfirm({ ...b, id })}
-                    >
+                    <button className="icon-btn" title="Delete" onClick={() => openConfirm({ ...b, id })}>
                       <img className="icon" src="/bin.png" alt="delete" />
                     </button>
                   </div>
@@ -499,13 +516,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div
-                  className="progress"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={pct}
-                >
+                <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
                   <div className="bar" style={barStyle} />
                 </div>
               </div>
@@ -515,21 +526,27 @@ export default function Home() {
 
         {/* ===== Create Budget Modal ===== */}
         {showBudgetModal && (
-          <div
-            className="modal-overlay"
-            onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}
-          >
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}>
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Create Budget</h3>
               </div>
               <div className="modal-body">
+                {createBudError && (
+                  <div className="error" style={{ marginBottom: 12, textAlign: "center" }}>
+                    {createBudError}
+                  </div>
+                )}
+
                 <div className="form-row">
                   <label>Category</label>
                   <select
                     className="input"
                     value={String(selectedCategory || 0)}
-                    onChange={(e) => setSelectedCategory(Number(e.target.value))}
+                    onChange={(e) => {
+                      setSelectedCategory(Number(e.target.value));
+                      setCreateBudError(""); // เปลี่ยนหมวดแล้วเคลียร์ error
+                    }}
                   >
                     {categories.length === 0 && <option disabled>No categories</option>}
                     {categories.map((c) => {
@@ -543,6 +560,7 @@ export default function Home() {
                     })}
                   </select>
                 </div>
+
                 <div className="form-row">
                   <label>Amount</label>
                   <input
@@ -556,14 +574,15 @@ export default function Home() {
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </div>
+
                 <div className="modal-actions center">
                   <button
                     type="button"
                     className="btn btn-purple"
-                    disabled={!selectedCategory || !amount || Number(amount) <= 0}
+                    disabled={!selectedCategory || !amount || Number(amount) <= 0 || createBudSaving}
                     onClick={createBudget}
                   >
-                    Create
+                    {createBudSaving ? "Creating..." : "Create"}
                   </button>
                   <button type="button" className="btn" onClick={() => setShowBudgetModal(false)}>
                     Cancel
@@ -574,7 +593,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ===== Edit Budget Modal ===== */}
+        {/* ===== Edit Budget Modal (Category read-only) ===== */}
         {edit && (
           <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setEdit(null)}>
             <div className="modal">
@@ -584,22 +603,7 @@ export default function Home() {
               <div className="modal-body">
                 <div className="form-row">
                   <label>Category</label>
-                  <select
-                    className="input"
-                    value={String(edit.category_id)}
-                    onChange={(e) => setEdit((x) => ({ ...x, category_id: e.target.value }))}
-                  >
-                    {categories.length === 0 && <option disabled>No categories</option>}
-                    {categories.map((c) => {
-                      const id = (c.category_id ?? c.id)?.toString();
-                      const name = c.category_name ?? c.name ?? `Category ${id ?? ""}`;
-                      return (
-                        <option key={id} value={id}>
-                          {name}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <input className="input" type="text" value={catName(edit.category_id)} readOnly />
                 </div>
 
                 <div className="form-row">
@@ -614,22 +618,31 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="form-row">
-                  <label>Cycle month</label>
-                  <input
-                    type="month"
-                    className="input"
-                    value={edit.cycle_month}
-                    onChange={(e) => setEdit((x) => ({ ...x, cycle_month: e.target.value }))}
-                  />
-                </div>
-
                 <div className="modal-actions center">
                   <button
                     type="button"
                     className="btn btn-purple"
-                    disabled={savingEdit || !edit.category_id || !edit.budget_amount || Number(edit.budget_amount) <= 0}
-                    onClick={updateBudget}
+                    disabled={savingEdit || !edit.budget_amount || Number(edit.budget_amount) <= 0}
+                    onClick={async () => {
+                      try {
+                        setSavingEdit(true);
+                        await api.put(`/protected/api/v1/budgets/${edit.id}`, {
+                          category_id: Number(edit.category_id),
+                          budget_amount: Number(edit.budget_amount),
+                        });
+                        setEdit(null);
+                        await loadAll();
+                      } catch (err) {
+                        console.error("Update budget error:", err);
+                        alert(
+                          axios.isAxiosError(err)
+                            ? err.response?.data?.message || "อัปเดต Budget ไม่สำเร็จ"
+                            : "เกิดข้อผิดพลาด"
+                        );
+                      } finally {
+                        setSavingEdit(false);
+                      }
+                    }}
                   >
                     {savingEdit ? "Saving..." : "Save"}
                   </button>
@@ -673,10 +686,7 @@ export default function Home() {
 
         {/* ===== Add Transaction Modal ===== */}
         {showTxnModal && (
-          <div
-            className="modal-overlay"
-            onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}
-          >
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}>
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Add Transaction</h3>
@@ -686,7 +696,6 @@ export default function Home() {
 
                 <div className="form-grid-2">
                   <div className="form-row">
-                    {/* 🔒 ล็อกเป็น "วันนี้" */}
                     <input
                       ref={firstInputRef}
                       type="date"
@@ -754,13 +763,7 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-green"
-                    disabled={
-                      txnSaving ||
-                      !txnType ||
-                      !txnCategory ||
-                      !txnAmount ||
-                      Number(txnAmount) <= 0
-                    }
+                    disabled={txnSaving || !txnType || !txnCategory || !txnAmount || Number(txnAmount) <= 0}
                     onClick={addTransaction}
                   >
                     {txnSaving ? "Saving..." : "Add"}
