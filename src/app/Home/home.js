@@ -193,24 +193,20 @@ export default function Home() {
         setSelectedCategory(firstId);
       }
 
-      // ✅ ใช้ category_id เท่านั้น (เลิกใช้ b.id เป็น fallback)
-      const budSet = new Set(buds.map((b) => String(b.category_id ?? "")));
-
-      const inc = txs
+      // ===== คำนวณสรุปรายรับ/รายจ่ายสำหรับการ์ด Summary ด้านบน =====
+      //    ✅ FIX: ให้รวมทุก transaction ของเดือนนี้
+      //    ไม่ได้จำกัดเฉพาะ category ที่มี budget อีกต่อไป
+      const incAllMonth = txs
         .filter((t) => String(t.type ?? "").toLowerCase() === "income" && isInSelectedMonth(t))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
 
-      const exp = txs
-        .filter(
-          (t) =>
-            String(t.type ?? "").toLowerCase() === "expense" &&
-            isInSelectedMonth(t) &&
-            budSet.has(String(t.category_id ?? t.categoryId ?? ""))
-        )
+      const expAllMonth = txs
+        .filter((t) => String(t.type ?? "").toLowerCase() === "expense" && isInSelectedMonth(t))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
 
-      setIncome(inc);
-      setExpenses(exp);
+      // ✅ อัปเดต state ที่ใช้โชว์ Income / Expenses / Balance
+      setIncome(incAllMonth);     // ✅ FIX
+      setExpenses(expAllMonth);   // ✅ FIX
     } catch (err) {
       console.error("loadAll error:", err);
       const msg = axios.isAxiosError(err) ? err.response?.data?.message : null;
@@ -309,7 +305,7 @@ export default function Home() {
       setTxnNote("");
       setTxnCategory("");
       setTxnType("");
-      await loadAll();
+      await loadAll(); // ✅ หลังเพิ่ม transaction ใหม่ summary ด้านบนจะอัปเดตถูกต้องแล้ว
     } catch (err) {
       console.error(err);
       setTxnError(
@@ -494,14 +490,24 @@ export default function Home() {
                     <div className="meta">Last Paid on {paid}</div>
                   </div>
                   <div className="right">
-                    <button className="icon-btn" title="Edit" onClick={() => setEdit({
-                      id: b.budget_id ?? b.id,
-                      category_id: String(b.category_id ?? ""),
-                      budget_amount: String(b.budget_amount ?? ""),
-                    })}>
+                    <button
+                      className="icon-btn"
+                      title="Edit"
+                      onClick={() =>
+                        setEdit({
+                          id: b.budget_id ?? b.id,
+                          category_id: String(b.category_id ?? ""),
+                          budget_amount: String(b.budget_amount ?? ""),
+                        })
+                      }
+                    >
                       <img className="icon" src="/edit.png" alt="edit" />
                     </button>
-                    <button className="icon-btn" title="Delete" onClick={() => openConfirm({ ...b, id })}>
+                    <button
+                      className="icon-btn"
+                      title="Delete"
+                      onClick={() => openConfirm({ ...b, id })}
+                    >
                       <img className="icon" src="/bin.png" alt="delete" />
                     </button>
                   </div>
@@ -511,12 +517,22 @@ export default function Home() {
                   <div className="bamount">
                     ฿{baht(spent)} <span className="muted">/ {baht(max)}</span>
                   </div>
-                  <span className={"pct-badge " + (pct >= 100 ? "danger" : pct >= 80 ? "warn" : "")}>
+                  <span
+                    className={
+                      "pct-badge " + (pct >= 100 ? "danger" : pct >= 80 ? "warn" : "")
+                    }
+                  >
                     {pct}%
                   </span>
                 </div>
 
-                <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+                <div
+                  className="progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct}
+                >
                   <div className="bar" style={barStyle} />
                 </div>
               </div>
@@ -526,14 +542,20 @@ export default function Home() {
 
         {/* ===== Create Budget Modal ===== */}
         {showBudgetModal && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setShowBudgetModal(false)}
+          >
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Create Budget</h3>
               </div>
               <div className="modal-body">
                 {createBudError && (
-                  <div className="error" style={{ marginBottom: 12, textAlign: "center" }}>
+                  <div
+                    className="error"
+                    style={{ marginBottom: 12, textAlign: "center" }}
+                  >
                     {createBudError}
                   </div>
                 )}
@@ -548,10 +570,15 @@ export default function Home() {
                       setCreateBudError(""); // เปลี่ยนหมวดแล้วเคลียร์ error
                     }}
                   >
-                    {categories.length === 0 && <option disabled>No categories</option>}
+                    {categories.length === 0 && (
+                      <option disabled>No categories</option>
+                    )}
                     {categories.map((c) => {
                       const id = Number(c.category_id ?? c.id ?? 0);
-                      const name = c.category_name ?? c.name ?? `Category ${id || ""}`;
+                      const name =
+                        c.category_name ??
+                        c.name ??
+                        `Category ${id || ""}`;
                       return (
                         <option key={id} value={id}>
                           {name}
@@ -579,12 +606,21 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-purple"
-                    disabled={!selectedCategory || !amount || Number(amount) <= 0 || createBudSaving}
+                    disabled={
+                      !selectedCategory ||
+                      !amount ||
+                      Number(amount) <= 0 ||
+                      createBudSaving
+                    }
                     onClick={createBudget}
                   >
                     {createBudSaving ? "Creating..." : "Create"}
                   </button>
-                  <button type="button" className="btn" onClick={() => setShowBudgetModal(false)}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setShowBudgetModal(false)}
+                  >
                     Cancel
                   </button>
                 </div>
@@ -595,7 +631,10 @@ export default function Home() {
 
         {/* ===== Edit Budget Modal (Category read-only) ===== */}
         {edit && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setEdit(null)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setEdit(null)}
+          >
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Edit Budget</h3>
@@ -603,7 +642,12 @@ export default function Home() {
               <div className="modal-body">
                 <div className="form-row">
                   <label>Category</label>
-                  <input className="input" type="text" value={catName(edit.category_id)} readOnly />
+                  <input
+                    className="input"
+                    type="text"
+                    value={catName(edit.category_id)}
+                    readOnly
+                  />
                 </div>
 
                 <div className="form-row">
@@ -614,7 +658,12 @@ export default function Home() {
                     min="0"
                     step="0.01"
                     value={edit.budget_amount}
-                    onChange={(e) => setEdit((x) => ({ ...x, budget_amount: e.target.value }))}
+                    onChange={(e) =>
+                      setEdit((x) => ({
+                        ...x,
+                        budget_amount: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
@@ -622,21 +671,29 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-purple"
-                    disabled={savingEdit || !edit.budget_amount || Number(edit.budget_amount) <= 0}
+                    disabled={
+                      savingEdit ||
+                      !edit.budget_amount ||
+                      Number(edit.budget_amount) <= 0
+                    }
                     onClick={async () => {
                       try {
                         setSavingEdit(true);
-                        await api.put(`/protected/api/v1/budgets/${edit.id}`, {
-                          category_id: Number(edit.category_id),
-                          budget_amount: Number(edit.budget_amount),
-                        });
+                        await api.put(
+                          `/protected/api/v1/budgets/${edit.id}`,
+                          {
+                            category_id: Number(edit.category_id),
+                            budget_amount: Number(edit.budget_amount),
+                          }
+                        );
                         setEdit(null);
                         await loadAll();
                       } catch (err) {
                         console.error("Update budget error:", err);
                         alert(
                           axios.isAxiosError(err)
-                            ? err.response?.data?.message || "อัปเดต Budget ไม่สำเร็จ"
+                            ? err.response?.data?.message ||
+                                "อัปเดต Budget ไม่สำเร็จ"
                             : "เกิดข้อผิดพลาด"
                         );
                       } finally {
@@ -646,7 +703,11 @@ export default function Home() {
                   >
                     {savingEdit ? "Saving..." : "Save"}
                   </button>
-                  <button type="button" className="btn" onClick={() => setEdit(null)}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setEdit(null)}
+                  >
                     Cancel
                   </button>
                 </div>
@@ -657,7 +718,10 @@ export default function Home() {
 
         {/* ===== Confirm Delete ===== */}
         {confirm && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setConfirm(null)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setConfirm(null)}
+          >
             <div className="modal" role="dialog" aria-modal="true">
               <div className="modal-header center">
                 <h3 className="modal-title">Delete budget?</h3>
@@ -666,16 +730,27 @@ export default function Home() {
                 <p className="muted" style={{ textAlign: "center" }}>
                   ต้องการลบงบประมาณ <b>{confirm.name}</b> ใช่ไหม การลบจะไม่สามารถเรียกคืนได้
                 </p>
-                <div className="modal-actions center" style={{ gap: 10 }}>
+                <div
+                  className="modal-actions center"
+                  style={{ gap: 10 }}
+                >
                   <button
                     type="button"
                     className="btn btn-red"
                     onClick={doDelete}
-                    disabled={deletingId === String(confirm.id)}
+                    disabled={
+                      deletingId === String(confirm.id)
+                    }
                   >
-                    {deletingId === String(confirm.id) ? "Deleting..." : "Delete"}
+                    {deletingId === String(confirm.id)
+                      ? "Deleting..."
+                      : "Delete"}
                   </button>
-                  <button type="button" className="btn" onClick={() => setConfirm(null)}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setConfirm(null)}
+                  >
                     Cancel
                   </button>
                 </div>
@@ -686,13 +761,20 @@ export default function Home() {
 
         {/* ===== Add Transaction Modal ===== */}
         {showTxnModal && (
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}>
+          <div
+            className="modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setShowTxnModal(false)}
+          >
             <div className="modal">
               <div className="modal-header center">
                 <h3 className="modal-title">Add Transaction</h3>
               </div>
               <div className="modal-body">
-                {txnError && <div className="error" style={{ marginBottom: 12 }}>{txnError}</div>}
+                {txnError && (
+                  <div className="error" style={{ marginBottom: 12 }}>
+                    {txnError}
+                  </div>
+                )}
 
                 <div className="form-grid-2">
                   <div className="form-row">
@@ -704,14 +786,23 @@ export default function Home() {
                       readOnly
                       onKeyDown={(e) => e.preventDefault()}
                       onMouseDown={(e) => e.preventDefault()}
-                      style={{ cursor: "not-allowed", background: "var(--panel)" }}
+                      style={{
+                        cursor: "not-allowed",
+                        background: "var(--panel)",
+                      }}
                       title="Fixed to today"
                     />
                   </div>
 
                   <div className="form-row">
-                    <select className="input" value={txnType} onChange={(e) => setTxnType(e.target.value)}>
-                      <option value="" disabled hidden>Type</option>
+                    <select
+                      className="input"
+                      value={txnType}
+                      onChange={(e) => setTxnType(e.target.value)}
+                    >
+                      <option value="" disabled hidden>
+                        Type
+                      </option>
                       <option value="income">Income</option>
                       <option value="expense">Expense</option>
                     </select>
@@ -724,13 +815,24 @@ export default function Home() {
                       onChange={(e) => setTxnCategory(e.target.value)}
                       ref={catSelectRef}
                     >
-                      <option value="" disabled hidden>Category</option>
-                      {categories.length === 0 && <option disabled>No categories</option>}
+                      <option value="" disabled hidden>
+                        Category
+                      </option>
+                      {categories.length === 0 && (
+                        <option disabled>No categories</option>
+                      )}
                       {categories.map((c) => {
-                        const id = String(c.category_id ?? c.id ?? "");
-                        const name = c.category_name ?? c.name ?? `Category ${id || ""}`;
+                        const id = String(
+                          c.category_id ?? c.id ?? ""
+                        );
+                        const name =
+                          c.category_name ??
+                          c.name ??
+                          `Category ${id || ""}`;
                         return (
-                          <option key={id} value={id}>{name}</option>
+                          <option key={id} value={id}>
+                            {name}
+                          </option>
                         );
                       })}
                     </select>
@@ -749,7 +851,10 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="form-row" style={{ marginTop: 12 }}>
+                <div
+                  className="form-row"
+                  style={{ marginTop: 12 }}
+                >
                   <input
                     type="text"
                     className="input"
@@ -763,12 +868,24 @@ export default function Home() {
                   <button
                     type="button"
                     className="btn btn-green"
-                    disabled={txnSaving || !txnType || !txnCategory || !txnAmount || Number(txnAmount) <= 0}
+                    disabled={
+                      txnSaving ||
+                      !txnType ||
+                      !txnCategory ||
+                      !txnAmount ||
+                      Number(txnAmount) <= 0
+                    }
                     onClick={addTransaction}
                   >
                     {txnSaving ? "Saving..." : "Add"}
                   </button>
-                  <button type="button" className="btn" onClick={() => setShowTxnModal(false)}>Cancel</button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setShowTxnModal(false)}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             </div>
