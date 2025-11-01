@@ -4,6 +4,7 @@ import Link from "next/link";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import "./stylee.css";
+import api from "@/app/lib/axiosClient";
 
 export default function Register() {
   const [firstName, setfirstName] = useState("");
@@ -30,7 +31,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await axios.post("http://localhost:4000/api/v1/auth/register", {
+      await api.post("/api/v1/auth/register", {
         first_name: firstName,
         last_name:  lastName,
         username,

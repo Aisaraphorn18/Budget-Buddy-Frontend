@@ -2,8 +2,10 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://budget-buddy-backend-production.up.railway.app",
+  baseURL: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000",
 });
+
+console.log("API Base URL:", api.defaults.baseURL);
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {

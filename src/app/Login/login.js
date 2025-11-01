@@ -4,6 +4,7 @@ import Link from "next/link";
 import axios from "axios";
 import { useState, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/app/lib/axiosClient";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -31,7 +32,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:4000/api/v1/auth/login", {
+      const res = await api.post("/api/v1/auth/login", {
         username,
         password,
       });

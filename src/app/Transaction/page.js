@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "@/app/components/sidebar";
 import "./styles.css";
-
+import api from "@/app/lib/axiosClient";
 /* ===== Theme utils ===== */
 const THEME_KEY = "theme";
 const readTheme = () => {
@@ -79,8 +79,8 @@ export default function Transactions() {
       setLoading(true);
       setError("");
       try {
-        const txReq  = axios.get("http://localhost:4000/protected/api/v1/transactions", makeAuth());
-        const catReq = axios.get("http://localhost:4000/protected/api/v1/categories", makeAuth());
+        const txReq  = api.get("/protected/api/v1/transactions", makeAuth());
+        const catReq = api.get("/protected/api/v1/categories", makeAuth());
         const [txRes, catRes] = await Promise.all([txReq, catReq]);
 
         // category map
