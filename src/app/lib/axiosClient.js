@@ -10,7 +10,7 @@ const api = axios.create({
   }
 });
 
-console.log("API Base URL:", api.defaults.baseURL);
+// console.log("API Base URL:", api.defaults.baseURL);
 
 // ฟังก์ชันดึง CSRF Token
 export const fetchCsrfToken = async () => {
@@ -18,7 +18,7 @@ export const fetchCsrfToken = async () => {
     const response = await api.get("/api/v1/csrf-token");
     const { csrfToken } = response.data;
 
-    console.log("Fetched CSRF Token:", csrfToken);
+    // console.log("Fetched CSRF Token:", csrfToken);
 
     if (csrfToken && typeof window !== "undefined") {
       localStorage.setItem("csrfToken", csrfToken);
