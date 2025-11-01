@@ -4,6 +4,10 @@ import axios from "axios";
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:4000",
   withCredentials: true, // สำคัญ! ต้องส่ง cookie
+  headers: {
+    "Content-Type": "application/json",
+    "X-CSRF-Token": "" // จะถูกตั้งค่าใน interceptor
+  }
 });
 
 console.log("API Base URL:", api.defaults.baseURL);
@@ -13,11 +17,13 @@ export const fetchCsrfToken = async () => {
   try {
     const response = await api.get("/api/v1/csrf-token");
     const { csrfToken } = response.data;
-    
+
+    console.log("Fetched CSRF Token:", csrfToken);
+
     if (csrfToken && typeof window !== "undefined") {
       localStorage.setItem("csrfToken", csrfToken);
     }
-    
+
     return csrfToken;
   } catch (error) {
     console.error("Failed to fetch CSRF token:", error);
@@ -33,9 +39,9 @@ api.interceptors.request.use((config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // เพิ่ม CSRF Token สำหรับ POST, PUT, DELETE, PATCH
-    const methodsRequiringCsrf = ["post", "put", "delete", "patch"];
+    const methodsRequiringCsrf = ["get", "post", "put", "delete", "patch"];
     if (methodsRequiringCsrf.includes(config.method?.toLowerCase())) {
       const csrfToken = localStorage.getItem("csrfToken");
       if (csrfToken) {
