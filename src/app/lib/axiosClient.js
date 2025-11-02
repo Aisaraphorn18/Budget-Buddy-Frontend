@@ -21,7 +21,7 @@ export const fetchCsrfToken = async () => {
     // ลบ console.log เพื่อความปลอดภัย - ไม่แสดง token ใน console
 
     if (csrfToken && typeof window !== "undefined") {
-      sessionStorage.setItem("csrfToken", csrfToken);
+      localStorage.setItem("csrfToken", csrfToken);
     }
 
     return csrfToken;
@@ -35,7 +35,7 @@ export const fetchCsrfToken = async () => {
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     // เพิ่ม JWT Token
-    const token = sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,7 +43,7 @@ api.interceptors.request.use((config) => {
     // เพิ่ม CSRF Token สำหรับ POST, PUT, DELETE, PATCH
     const methodsRequiringCsrf = ["get", "post", "put", "delete", "patch"];
     if (methodsRequiringCsrf.includes(config.method?.toLowerCase())) {
-      const csrfToken = sessionStorage.getItem("csrfToken");
+      const csrfToken = localStorage.getItem("csrfToken");
       if (csrfToken) {
         config.headers["X-CSRF-Token"] = csrfToken;
       }
